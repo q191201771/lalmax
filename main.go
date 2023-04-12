@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"lalmax/srt"
 	"os"
 
 	"github.com/q191201771/naza/pkg/nazalog"
 
 	"github.com/q191201771/lal/pkg/base"
+
+	config "lalmax/conf"
 
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/bininfo"
@@ -17,10 +21,29 @@ func main() {
 	defer nazalog.Sync()
 
 	confFilename := parseFlag()
+	err := config.Open(confFilename)
+	if err != nil {
+		nazalog.Errorf("open config failed, configname:%+v", confFilename)
+		return
+	}
+
+	maxConf := config.GetConfig()
+
 	lals := logic.NewLalServer(func(option *logic.Option) {
-		option.ConfFilename = confFilename
+		option.ConfFilename = maxConf.LalSvrConfigPath
 	})
-	err := lals.RunLoop()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if maxConf.SrtConfig.Enable {
+		go func() {
+			srtSvr := srt.NewSrtServer(maxConf.SrtConfig, lals)
+			srtSvr.Run(ctx)
+		}()
+	}
+
+	err = lals.RunLoop()
 	nazalog.Infof("server manager done. err=%+v", err)
 }
 
