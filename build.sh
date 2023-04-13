@@ -33,8 +33,9 @@ else
 fi
 
 echo "build libsrt"
-cd thirdparty/srt
-make clean
+cd thirdparty/
+tar -xvzf srt-1.5.1.tar.gz
+cd srt-1.5.1
 ./configure
 make
 make install
