@@ -7,8 +7,6 @@ import (
 	"context"
 	"net"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/haivision/srtgo"
 	"github.com/q191201771/lal/pkg/base"
@@ -19,19 +17,16 @@ import (
 )
 
 type SrtServer struct {
-	host       string
-	port       uint16
-	lalServer  logic.ILalServer
-	mu         sync.Mutex
-	publishers map[string]*Publisher
+	host      string
+	port      uint16
+	lalServer logic.ILalServer
 }
 
 func NewSrtServer(conf config.SrtConfig, lal logic.ILalServer) *SrtServer {
 	svr := &SrtServer{
-		host:       conf.Host,
-		port:       conf.Port,
-		lalServer:  lal,
-		publishers: make(map[string]*Publisher),
+		host:      conf.Host,
+		port:      conf.Port,
+		lalServer: lal,
 	}
 
 	nazalog.Infof("create srt server. host:%s, port:%d", svr.host, svr.port)
@@ -69,8 +64,7 @@ func (s *SrtServer) Run(ctx context.Context) {
 
 func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *net.UDPAddr) {
 	var (
-		err error
-		//pub      *Publisher
+		err      error
 		streamid *StreamID
 	)
 
@@ -85,11 +79,11 @@ func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *n
 		return
 	}
 
+	// https://github.com/Haivision/srt/blob/master/docs/features/access-control.md
 	switch streamid.Mode {
 	case "publish", "PUBLISH":
 		// make a new publisher
-		publisher := NewPublisher(ctx, streamid.Host, streamid.User, socket, s)
-
+		publisher := NewPublisher(ctx, streamid.Host, socket, s)
 		session, err := s.lalServer.AddCustomizePubSession(streamid.Host)
 		if err != nil {
 			nazalog.Error(err)
@@ -102,17 +96,11 @@ func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *n
 		}
 
 		publisher.SetSession(session)
-		s.Register(streamid.Host, publisher)
-		go publisher.Run()
-	case "play", "PLAY", "subscribe", "SUBSCRIBE":
+		publisher.Run()
+	case "request", "REQUEST":
 		// make a new subscriber
-		subscriber := NewSubscriber(ctx, socket)
-		pub, ok := s.publishers[streamid.Host]
-		if !ok || pub == nil {
-			nazalog.Error(err)
-			return
-		}
-		pub.subscribers = append(pub.subscribers, subscriber)
+		subscriber := NewSubscriber(ctx, socket, streamid)
+		subscriber.Run()
 	default:
 		return
 	}
@@ -145,20 +133,6 @@ func (s *SrtServer) listenCallback(socket *srtgo.SrtSocket, version int, addr *n
 	return true
 }
 
-func (s *SrtServer) Register(host string, publisher *Publisher) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	s.publishers[host] = publisher
-}
-
 func (s *SrtServer) Remove(host string, ss logic.ICustomizePubSessionContext) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	time.Sleep(5 * time.Second)
 	s.lalServer.DelCustomizePubSession(ss)
-	if _, ok := s.publishers[host]; ok {
-		delete(s.publishers, host)
-	}
 }

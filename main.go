@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"lalmax/hook"
 	"lalmax/srt"
 	"os"
 
@@ -31,6 +32,12 @@ func main() {
 
 	lals := logic.NewLalServer(func(option *logic.Option) {
 		option.ConfFilename = maxConf.LalSvrConfigPath
+	})
+
+	// 在常规lalserver基础上增加这行，用于演示hook lalserver中的流
+	lals.WithOnHookSession(func(uniqueKey string, streamName string) logic.ICustomizeHookSessionContext {
+		// 有新的流了，创建业务层的对象，用于hook这个流
+		return hook.NewHookSession(uniqueKey, streamName)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
