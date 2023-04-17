@@ -23,7 +23,7 @@ type Publisher struct {
 	subscribers []*Subscriber
 }
 
-func NewPublisher(ctx context.Context, host, user string, socket *srtgo.SrtSocket, srv *SrtServer) *Publisher {
+func NewPublisher(ctx context.Context, host string, socket *srtgo.SrtSocket, srv *SrtServer) *Publisher {
 	pub := &Publisher{
 		ctx:        ctx,
 		srv:        srv,
@@ -31,6 +31,8 @@ func NewPublisher(ctx context.Context, host, user string, socket *srtgo.SrtSocke
 		socket:     socket,
 		demuxer:    ts.NewTSDemuxer(),
 	}
+
+	nazalog.Infof("create srt publisher, streamName:%s", host)
 	return pub
 }
 
