@@ -16,7 +16,7 @@ import (
 type Subscriber struct {
 	ctx             context.Context
 	socket          *srtgo.SrtSocket
-	streamid        *StreamID
+	streamName      string
 	muxer           *ts.TSMuxer
 	hasInit         bool
 	videoPid        uint16
@@ -28,23 +28,23 @@ type Subscriber struct {
 	subscriberId    string
 }
 
-func NewSubscriber(ctx context.Context, socket *srtgo.SrtSocket, streamid *StreamID) *Subscriber {
+func NewSubscriber(ctx context.Context, socket *srtgo.SrtSocket, streamName string) *Subscriber {
 
 	sub := &Subscriber{
 		ctx:          ctx,
 		socket:       socket,
-		streamid:     streamid,
+		streamName:   streamName,
 		muxer:        ts.NewTSMuxer(),
 		subscriberId: uuid.NewV4().String(),
 	}
 
-	nazalog.Infof("create srt subscriber, streamName:%s, subscriberId:%s", sub.streamid.Host, sub.subscriberId)
+	nazalog.Infof("create srt subscriber, streamName:%s, subscriberId:%s", streamName, sub.subscriberId)
 
 	return sub
 }
 
 func (s *Subscriber) Run() {
-	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(s.streamid.Host)
+	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(s.streamName)
 	if ok {
 		var err error
 
@@ -70,7 +70,7 @@ func (s *Subscriber) Run() {
 			}
 		}
 	} else {
-		nazalog.Warnf("not found hook session, streamName:%s", s.streamid.Host)
+		nazalog.Warnf("not found hook session, streamName:%s", s.streamName)
 		s.socket.Close()
 	}
 }
@@ -78,7 +78,7 @@ func (s *Subscriber) Run() {
 func (s *Subscriber) OnMsg(msg base.RtmpMsg) {
 	var err error
 	if !s.hasInit {
-		ok, session := hook.GetHookSessionManagerInstance().GetHookSession(s.streamid.Host)
+		ok, session := hook.GetHookSessionManagerInstance().GetHookSession(s.streamName)
 		if ok {
 			videoheader := session.GetVideoSeqHeaderMsg()
 			if videoheader != nil {

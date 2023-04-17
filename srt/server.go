@@ -83,8 +83,8 @@ func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *n
 	switch streamid.Mode {
 	case "publish", "PUBLISH":
 		// make a new publisher
-		publisher := NewPublisher(ctx, streamid.Host, socket, s)
-		session, err := s.lalServer.AddCustomizePubSession(streamid.Host)
+		publisher := NewPublisher(ctx, streamid.Resource, socket, s)
+		session, err := s.lalServer.AddCustomizePubSession(streamid.Resource)
 		if err != nil {
 			nazalog.Error(err)
 		}
@@ -99,7 +99,7 @@ func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *n
 		publisher.Run()
 	case "request", "REQUEST":
 		// make a new subscriber
-		subscriber := NewSubscriber(ctx, socket, streamid)
+		subscriber := NewSubscriber(ctx, socket, streamid.Resource)
 		subscriber.Run()
 	default:
 		return
