@@ -119,7 +119,7 @@ func (s *SrtServer) listenCallback(socket *srtgo.SrtSocket, version int, addr *n
 		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
 		return false
 	}
-	if id.Host == "" {
+	if id.Resource == "" {
 		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
 		return false
 	}
