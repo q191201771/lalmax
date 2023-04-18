@@ -42,7 +42,7 @@ func (s *SrtServer) Run(ctx context.Context) {
 
 	sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, srtgo.SRTO_LOSSMAXTTL)
 	sck.SetListenCallback(s.listenCallback)
-	if err := sck.Listen(1); err != nil {
+	if err := sck.Listen(128); err != nil {
 		panic(err)
 	}
 
