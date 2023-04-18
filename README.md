@@ -40,7 +40,7 @@ lalmax是以lal为内核的卍解
 ## SRT
 注：
 
-（1）SRT推拉流依赖libsrt库,run.sh中有编译libsrt，如果run.sh无法编译libsrt，需要自己另行libsrt
+（1）SRT推拉流依赖libsrt库,run.sh中有编译libsrt，如果run.sh无法编译libsrt，需要自己另行编译libsrt
 （2）暂时不支持SRT加密
 
 推流url
