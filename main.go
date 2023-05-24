@@ -45,7 +45,10 @@ func main() {
 
 	if maxConf.SrtConfig.Enable {
 		go func() {
-			srtSvr := srt.NewSrtServer(maxConf.SrtConfig, lals)
+			srtSvr := srt.NewSrtServer(maxConf.SrtConfig.Host, maxConf.SrtConfig.Port, lals, func(option *srt.SrtOption) {
+				option.Latency = 300
+				option.PeerLatency = 300
+			})
 			srtSvr.Run(ctx)
 		}()
 	}
