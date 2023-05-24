@@ -14,28 +14,30 @@ import (
 )
 
 type Subscriber struct {
-	ctx             context.Context
-	socket          *srtgo.SrtSocket
-	streamName      string
-	muxer           *ts.TSMuxer
-	hasInit         bool
-	videoPid        uint16
-	audioPid        uint16
-	flvVideoDemuxer flv.VideoTagDemuxer
-	flvAudioDemuxer flv.AudioTagDemuxer
-	videodts        uint32
-	audiodts        uint32
-	subscriberId    string
+	ctx               context.Context
+	socket            *srtgo.SrtSocket
+	streamName        string
+	muxer             *ts.TSMuxer
+	hasInit           bool
+	videoPid          uint16
+	audioPid          uint16
+	flvVideoDemuxer   flv.VideoTagDemuxer
+	flvAudioDemuxer   flv.AudioTagDemuxer
+	videodts          uint32
+	audiodts          uint32
+	subscriberId      string
+	maxSendPacketSize int
 }
 
-func NewSubscriber(ctx context.Context, socket *srtgo.SrtSocket, streamName string) *Subscriber {
+func NewSubscriber(ctx context.Context, socket *srtgo.SrtSocket, streamName string, maxSendPacketSize int) *Subscriber {
 
 	sub := &Subscriber{
-		ctx:          ctx,
-		socket:       socket,
-		streamName:   streamName,
-		muxer:        ts.NewTSMuxer(),
-		subscriberId: uuid.NewV4().String(),
+		ctx:               ctx,
+		socket:            socket,
+		streamName:        streamName,
+		muxer:             ts.NewTSMuxer(),
+		subscriberId:      uuid.NewV4().String(),
+		maxSendPacketSize: maxSendPacketSize,
 	}
 
 	nazalog.Infof("create srt subscriber, streamName:%s, subscriberId:%s", streamName, sub.subscriberId)
@@ -47,7 +49,7 @@ func (s *Subscriber) Run() {
 	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(s.streamName)
 	if ok {
 		var err error
-
+		sendBuf := make([]byte, 0, s.maxSendPacketSize*ts.TS_PAKCET_SIZE)
 		session.AddConsumer(s.subscriberId, s)
 		s.muxer.OnPacket = func(tsPacket []byte) {
 			defer func() {
@@ -63,11 +65,15 @@ func (s *Subscriber) Run() {
 				return
 			default:
 			}
-
-			if _, err = s.socket.Write(tsPacket); err != nil {
-				session.RemoveConsumer(s.subscriberId)
-				return
+			if len(sendBuf) > (s.maxSendPacketSize-1)*ts.TS_PAKCET_SIZE {
+				if _, err = s.socket.Write(sendBuf); err != nil {
+					session.RemoveConsumer(s.subscriberId)
+					return
+				}
+				sendBuf = sendBuf[0:0]
 			}
+			sendBuf = append(sendBuf, tsPacket...)
+
 		}
 	} else {
 		nazalog.Warnf("not found hook session, streamName:%s", s.streamName)
