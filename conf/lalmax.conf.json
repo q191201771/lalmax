@@ -4,6 +4,12 @@
       "host": "0.0.0.0",
       "port": 6001
     },
+    "rtc_config": {
+      "enable": true,
+      "httpListenAddr": ":1290",
+      "iceUdpMuxPort": 4888,
+      "iceTcpMuxPort": 4888
+    },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 
