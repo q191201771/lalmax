@@ -2,12 +2,12 @@ package rtc
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/pion/rtp"
-	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 	"github.com/q191201771/lal/pkg/avc"
+	"github.com/q191201771/lal/pkg/base"
+	"github.com/q191201771/lal/pkg/rtprtcp"
 	"github.com/q191201771/naza/pkg/nazalog"
 )
 
@@ -29,45 +29,86 @@ func NewPacker(mimeType string, codec []byte) *Packer {
 	return p
 }
 
-func (p *Packer) Encode(data []byte, pts uint32) ([]*rtp.Packet, error) {
-	return p.enc.Encode(data, pts)
+func (p *Packer) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
+	return p.enc.Encode(msg)
 }
 
 type IRtpEncoder interface {
-	Encode(data []byte, pts uint32) ([]*rtp.Packet, error)
+	Encode(msg base.RtmpMsg) ([]*rtp.Packet, error)
 }
 
 type H264RtpEncoder struct {
 	IRtpEncoder
-	codec      []byte
-	packetizer rtp.Packetizer
+	sps       []byte
+	pps       []byte
+	rtpPacker *rtprtcp.RtpPacker
 }
 
 func NewH264RtpEncoder(codec []byte) *H264RtpEncoder {
-	spspps, err := avc.SpsPpsSeqHeader2Annexb(codec)
+
+	sps, pps, err := avc.ParseSpsPpsFromSeqHeader(codec)
 	if err != nil {
 		nazalog.Error(err)
 		return nil
 	}
 
-	enc := &H264RtpEncoder{
-		codec:      codec,
-		packetizer: rtp.NewPacketizer(1400, 96, rand.Uint32(), &codecs.H264Payloader{}, rtp.NewRandomSequencer(), 90000),
-	}
+	pp := rtprtcp.NewRtpPackerPayloadAvc(func(option *rtprtcp.RtpPackerPayloadAvcHevcOption) {
+		option.Typ = rtprtcp.RtpPackerPayloadAvcHevcTypeAnnexb
+	})
 
-	enc.packetizer.Packetize(spspps, 0)
-	return enc
+	return &H264RtpEncoder{
+		sps:       sps,
+		pps:       pps,
+		rtpPacker: rtprtcp.NewRtpPacker(pp, 90000, 0),
+	}
 }
 
-func (enc *H264RtpEncoder) Encode(data []byte, pts uint32) ([]*rtp.Packet, error) {
-	nalus, err := avc.Avcc2Annexb(data)
+func (enc *H264RtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
+	var out []byte
+	err := avc.IterateNaluAvcc(msg.Payload[5:], func(nal []byte) {
+		t := avc.ParseNaluType(nal[0])
+		if t == avc.NaluTypeSei {
+			return
+		}
+
+		if t == avc.NaluTypeIdrSlice {
+			out = append(out, avc.NaluStartCode3...)
+			out = append(out, enc.sps...)
+			out = append(out, avc.NaluStartCode3...)
+			out = append(out, enc.pps...)
+		}
+
+		out = append(out, avc.NaluStartCode3...)
+		out = append(out, nal...)
+	})
+
 	if err != nil {
-		nazalog.Error(err)
-		return nil, err
+		return nil, fmt.Errorf("Packetize failed")
 	}
 
-	pkts := enc.packetizer.Packetize(nalus, pts)
-	if len(pkts) == 0 {
+	if len(out) == 0 {
+		return nil, fmt.Errorf("Packetize failed")
+	}
+
+	avpacket := base.AvPacket{
+		Timestamp: int64(msg.Dts()),
+		Payload:   out,
+	}
+
+	var pkts []*rtp.Packet
+	rtpPkts := enc.rtpPacker.Pack(avpacket)
+	for _, pkt := range rtpPkts {
+		var newRtpPkt rtp.Packet
+		err := newRtpPkt.Unmarshal(pkt.Raw)
+		if err != nil {
+			nazalog.Error(err)
+			continue
+		}
+
+		pkts = append(pkts, &newRtpPkt)
+	}
+
+	if len(rtpPkts) == 0 {
 		return nil, fmt.Errorf("Packetize failed")
 	}
 
@@ -76,19 +117,38 @@ func (enc *H264RtpEncoder) Encode(data []byte, pts uint32) ([]*rtp.Packet, error
 
 type G711RtpEncoder struct {
 	IRtpEncoder
-	packetizer rtp.Packetizer
+	rtpPacker *rtprtcp.RtpPacker
 }
 
 func NewG711RtpEncoder(pt uint8) *G711RtpEncoder {
 	// TODO 暂时采样率设置为8000
+	pp := rtprtcp.NewRtpPackerPayloadPcm()
+
 	return &G711RtpEncoder{
-		packetizer: rtp.NewPacketizer(1400, pt, rand.Uint32(), &codecs.G711Payloader{}, rtp.NewRandomSequencer(), 8000),
+		rtpPacker: rtprtcp.NewRtpPacker(pp, 8000, 0),
 	}
 }
 
-func (enc *G711RtpEncoder) Encode(data []byte, pts uint32) ([]*rtp.Packet, error) {
-	pkts := enc.packetizer.Packetize(data, pts)
-	if len(pkts) == 0 {
+func (enc *G711RtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
+	avpacket := base.AvPacket{
+		Timestamp: int64(msg.Dts()),
+		Payload:   msg.Payload[1:],
+	}
+
+	var pkts []*rtp.Packet
+	rtpPkts := enc.rtpPacker.Pack(avpacket)
+	for _, pkt := range rtpPkts {
+		var newRtpPkt rtp.Packet
+		err := newRtpPkt.Unmarshal(pkt.Raw)
+		if err != nil {
+			nazalog.Error(err)
+			continue
+		}
+
+		pkts = append(pkts, &newRtpPkt)
+	}
+
+	if len(rtpPkts) == 0 {
 		return nil, fmt.Errorf("Packetize failed")
 	}
 

@@ -177,7 +177,7 @@ func (conn *whepSession) OnStop() {
 
 func (conn *whepSession) sendAudio(msg base.RtmpMsg) {
 	if conn.audiopacker != nil {
-		pkts, err := conn.audiopacker.Encode(msg.Payload[1:], msg.Pts())
+		pkts, err := conn.audiopacker.Encode(msg)
 		if err != nil {
 			nazalog.Error(err)
 			return
@@ -194,7 +194,8 @@ func (conn *whepSession) sendAudio(msg base.RtmpMsg) {
 
 func (conn *whepSession) sendVideo(msg base.RtmpMsg) {
 	if conn.videopacker != nil {
-		pkts, err := conn.videopacker.Encode(msg.Payload[5:], msg.Pts())
+
+		pkts, err := conn.videopacker.Encode(msg)
 		if err != nil {
 			nazalog.Error(err)
 			return
