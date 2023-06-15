@@ -8,23 +8,23 @@ import (
 var defaultConfig Config
 
 type Config struct {
-	SrtConfig        SrtConfig `json:"srt_config"`
-	RtcConfig        RtcConfig `json:"rtc_config"`
-	LalSvrConfigPath string    `json:"lal_config_path"`
+	SrtConfig        SrtConfig `json:"srt_config"`      // srt配置
+	RtcConfig        RtcConfig `json:"rtc_config"`      // rtc配置
+	LalSvrConfigPath string    `json:"lal_config_path"` // lal配置目录
 }
 
 type SrtConfig struct {
-	Enable bool   `json:"enable"`
-	Host   string `json:"host"`
-	Port   uint16 `json:"port"`
+	Enable bool   `json:"enable"` // srt服务使能配置
+	Host   string `json:"host"`   // srt服务监听host
+	Port   uint16 `json:"port"`   // srt服务监听端口
 }
 
 type RtcConfig struct {
-	Enable          bool     `json:"enable"`
-	HttpListenAddr  string   `json:"httpListenAddr"`
-	ICEHostNATToIPs []string `json:"iceHostNatToIps"`
-	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`
-	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`
+	Enable          bool     `json:"enable"`          // rtc服务使能配置
+	HttpListenAddr  string   `json:"httpListenAddr"`  // rtc服务http监听地址
+	ICEHostNATToIPs []string `json:"iceHostNatToIps"` // rtc服务内穿ip
+	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`   // rtc udp mux port
+	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`   // rtc tcp mux port
 }
 
 func Open(filepath string) error {
