@@ -8,7 +8,7 @@
       "rtmps_addr": ":4935",
       "rtmps_cert_file": "./conf/cert.pem",
       "rtmps_key_file": "./conf/key.pem",
-      "gop_num": 0,
+      "gop_num": 1,
       "single_gop_max_frame_num": 0,
       "merge_write_size": 0
     },

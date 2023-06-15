@@ -38,12 +38,19 @@ func NewHookSession(uniqueKey, streamName string) *HookSession {
 }
 
 func (session *HookSession) OnMsg(msg base.RtmpMsg) {
+
 	if msg.IsVideoKeySeqHeader() {
 		session.cacheVideoHeaderMsg(&msg)
 	}
 
-	if msg.IsAacSeqHeader() {
-		session.cacheAudioHeaderMsg(&msg)
+	if msg.Header.MsgTypeId == base.RtmpTypeIdAudio {
+		if msg.IsAacSeqHeader() {
+			session.cacheAudioHeaderMsg(&msg)
+		}
+
+		if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
+			session.cacheAudioHeaderMsg(&msg)
+		}
 	}
 
 	// TODO:做缓存处理/纯音频

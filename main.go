@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"lalmax/hook"
+	"lalmax/rtc"
 	"lalmax/srt"
 	"os"
 
@@ -50,6 +51,13 @@ func main() {
 				option.PeerLatency = 300
 			})
 			srtSvr.Run(ctx)
+		}()
+	}
+
+	if maxConf.RtcConfig.Enable {
+		go func() {
+			rtcSvr := rtc.NewRtcServer(maxConf.RtcConfig, lals)
+			rtcSvr.Run()
 		}()
 	}
 
