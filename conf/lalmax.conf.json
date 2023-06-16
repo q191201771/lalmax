@@ -7,6 +7,10 @@
     "rtc_config": {
       "enable": true,
       "httpListenAddr": ":1290",
+      "enable_https": true,
+      "https_listen_addr": ":1233",
+      "https_cert_file": "./conf/cert.pem",
+      "https_key_file": "./conf/key.pem",
       "iceUdpMuxPort": 4888,
       "iceTcpMuxPort": 4888
     },

@@ -20,8 +20,12 @@ type SrtConfig struct {
 }
 
 type RtcConfig struct {
-	Enable          bool     `json:"enable"`          // rtc服务使能配置
-	HttpListenAddr  string   `json:"httpListenAddr"`  // rtc服务http监听地址
+	Enable          bool     `json:"enable"`         // rtc服务使能配置
+	HttpListenAddr  string   `json:"httpListenAddr"` // rtc服务http监听地址
+	EnableHttps     bool     `json:"enable_https"`
+	HttpsListenAddr string   `json:"https_listen_addr"`
+	HttpsCertFile   string   `json:"https_cert_file"`
+	HttpsKeyFile    string   `json:"https_key_file"`
 	ICEHostNATToIPs []string `json:"iceHostNatToIps"` // rtc服务内穿ip
 	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`   // rtc udp mux port
 	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`   // rtc tcp mux port

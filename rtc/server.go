@@ -1,6 +1,7 @@
 package rtc
 
 import (
+	"crypto/tls"
 	"io"
 	config "lalmax/conf"
 	"net"
@@ -28,12 +29,6 @@ func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) *RtcServer {
 }
 
 func (s *RtcServer) Run() (err error) {
-	listener, err := net.Listen("tcp", s.config.HttpListenAddr)
-	if err != nil {
-		nazalog.Error(err)
-		return
-	}
-
 	if s.config.ICEUDPMuxPort != 0 {
 		var udplistener *net.UDPConn
 		udplistener, err = net.ListenUDP("udp", &net.UDPAddr{
@@ -63,21 +58,57 @@ func (s *RtcServer) Run() (err error) {
 
 		s.tcpMux = webrtc.NewICETCPMux(nil, tcplistener, 20)
 	}
+	if s.config.EnableHttps {
+		go func() {
+			s.serveWithTLS(s.config.HttpsListenAddr, s.config.HttpsCertFile, s.config.HttpsKeyFile)
+		}()
+	}
+	return s.serveWithNet(s.config.HttpListenAddr)
 
+}
+func (s *RtcServer) serveWithNet(httpListenAddr string) error {
+	listener, err := net.Listen("tcp", httpListenAddr)
+	if err != nil {
+		nazalog.Errorf("start webrtc http  listen failed.  err=%+v", err)
+		return err
+	}
+	nazalog.Infof("start webrtc http server listen. addr=%s", httpListenAddr)
 	httpSvr := http.Server{
-		Addr:    s.config.HttpListenAddr,
+		Addr:    httpListenAddr,
 		Handler: http.HandlerFunc(s.ServeHttp),
 	}
-
 	err = httpSvr.Serve(listener)
 	if err != nil {
-		nazalog.Error(err)
+		nazalog.Errorf("webrtc http  Serve failed.  err=%+v", err)
+		return err
+	}
+	return nil
+}
+func (s *RtcServer) serveWithTLS(httpsListenAddr, certFile, keyFile string) {
+	var cert tls.Certificate
+	var err error
+	cert, err = tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		nazalog.Errorf("start webrtc https listen failed. certFile=%s, keyFile=%s, err=%+v", certFile, keyFile, err)
 		return
 	}
-
-	return
+	tlsConfig := &tls.Config{Certificates: []tls.Certificate{cert}}
+	listeners, err := tls.Listen("tcp", httpsListenAddr, tlsConfig)
+	if err != nil {
+		nazalog.Errorf("start webrtc https listen failed.  err=%+v", err)
+		return
+	}
+	nazalog.Infof("start webrtc https server listen. addr=%s", httpsListenAddr)
+	httpSvrs := http.Server{
+		Addr:    httpsListenAddr,
+		Handler: http.HandlerFunc(s.ServeHttp),
+	}
+	err = httpSvrs.Serve(listeners)
+	if err != nil {
+		nazalog.Errorf("webrtc https Serve failed.  err=%+v", err)
+		return
+	}
 }
-
 func (s *RtcServer) ServeHttp(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Access-Control-Allow-Origin", "*")
 	w.Header().Add("Access-Control-Allow-Headers", "*")
