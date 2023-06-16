@@ -20,11 +20,15 @@ type SrtConfig struct {
 }
 
 type RtcConfig struct {
-	Enable          bool     `json:"enable"`          // rtc服务使能配置
-	HttpListenAddr  string   `json:"httpListenAddr"`  // rtc服务http监听地址
-	ICEHostNATToIPs []string `json:"iceHostNatToIps"` // rtc服务内穿ip
-	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`   // rtc udp mux port
-	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`   // rtc tcp mux port
+	Enable          bool     `json:"enable"`            // rtc服务使能配置
+	HttpListenAddr  string   `json:"httpListenAddr"`    // rtc服务http监听地址
+	EnableHttps     bool     `json:"enable_https"`      // rtc服务https使能配置
+	HttpsListenAddr string   `json:"https_listen_addr"` // rtc服务https监听地址
+	HttpsCertFile   string   `json:"https_cert_file"`   // rtc服务https cert 文件
+	HttpsKeyFile    string   `json:"https_key_file"`    // rtc服务https key 文件
+	ICEHostNATToIPs []string `json:"iceHostNatToIps"`   // rtc服务内穿ip
+	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`     // rtc udp mux port
+	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`     // rtc tcp mux port
 }
 
 func Open(filepath string) error {

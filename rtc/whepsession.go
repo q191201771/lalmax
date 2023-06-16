@@ -165,6 +165,9 @@ func (conn *whepSession) OnMsg(msg base.RtmpMsg) {
 			conn.msgChan <- msg
 		}
 	case base.RtmpTypeIdVideo:
+		if msg.IsVideoKeySeqHeader() {
+			return
+		}
 		if conn.videoTrack != nil {
 			conn.msgChan <- msg
 		}
