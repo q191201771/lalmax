@@ -43,8 +43,11 @@ lalmax是以lal为内核的卍解
 
 ## SRT
 （1）SRT推拉流依赖libsrt库,run.sh中有编译libsrt，如果run.sh无法编译libsrt，需要自己另行编译libsrt
+
 （2）暂时不支持SRT加密
+
 （3）支持H264/H265/AAC
+
 （4）可以对接OBS/VLC
 
 推流url
@@ -55,8 +58,10 @@ srt://127.0.0.1:6001?streamid=#!::r=test110,m=request
 
 ## WebRTC
 （1）支持WHIP推流和WHEP拉流,暂时只支持POST信令
+
 （2）支持H264/G711A/G711U,后续支持opus音频
-（3）可以对接vue-wish
+
+（3）可以对接OBS、vue-wish
 
 WHIP推流url
 http://127.0.0.1:1290/whip?streamid=test110
