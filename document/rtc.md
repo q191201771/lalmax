@@ -90,9 +90,11 @@ WHEP拉流可以使用[vue-wish](https://github.com/zllovesuki/vue-wish)测试
 ### OBS测试效果
 使用OBS进行whip推流到lalmax中，并用vue-wish拉流，测试延时可以做到200ms以内
 
-OBS推流配置:
+OBS推流配置
+
 ![图片](../image/rtc_01.jpeg)
 
 vue-wish拉流效果
+
 ![图片](../image/rtc_02.png)
 
