@@ -64,10 +64,10 @@ srt://127.0.0.1:6001?streamid=#!::r=test110,m=request
 （3）可以对接OBS、vue-wish
 
 WHIP推流url
-http://127.0.0.1:1290/whip?streamid=test110
+http(s)://127.0.0.1:1290/whip?streamid=test110
 
 WHEP拉流url
-http://127.0.0.1:1290/whep?streamid=test110
+http(s)://127.0.0.1:1290/whep?streamid=test110
 
 
 
