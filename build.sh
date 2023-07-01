@@ -37,8 +37,8 @@ cd thirdparty/
 tar -xvzf srt-1.5.1.tar.gz
 cd srt-1.5.1
 ./configure
-make
-make install
+sudo make
+sudo make install
 cd ../../
 
 export LD_LIBRARY_PATH=/usr/local/lib/

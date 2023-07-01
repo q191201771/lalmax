@@ -7,6 +7,14 @@ lalmax是以lal为内核的卍解
 # 运行
 ./run.sh
 
+# docker运行
+```
+docker build -t lalmax:init ./
+
+docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 -p 8084:8084 -p 30000-30100:30000-30100/udp -p 1290:1290 -p 6001:6001/udp lalmax:init
+
+```
+
 # 架构
 
 ![图片](image/init.png)
