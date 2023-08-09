@@ -6,13 +6,18 @@
     },
     "rtc_config": {
       "enable": true,
-      "httpListenAddr": ":1290",
+      "iceUdpMuxPort": 4888,
+      "iceTcpMuxPort": 4888
+    },
+    "http_config": {
+      "http_listen_addr": ":1290",
       "enable_https": true,
       "https_listen_addr": ":1233",
       "https_cert_file": "./conf/cert.pem",
-      "https_key_file": "./conf/key.pem",
-      "iceUdpMuxPort": 4888,
-      "iceTcpMuxPort": 4888
+      "https_key_file": "./conf/key.pem"
+    },
+    "httpfmp4_config": {
+      "enable": true
     },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
