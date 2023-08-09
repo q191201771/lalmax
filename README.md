@@ -77,5 +77,9 @@ http(s)://127.0.0.1:1290/whip?streamid=test110
 WHEP拉流url
 http(s)://127.0.0.1:1290/whep?streamid=test110
 
+## Http-fmp4
+拉流url
+http(s)://127.0.0.1:1290/live/m4s/test110.mp4
+
 
 
