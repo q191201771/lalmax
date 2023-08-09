@@ -107,6 +107,7 @@ func (session *HookSession) AddConsumer(consumerId string, subscriber IHookSessi
 func (session *HookSession) RemoveConsumer(consumerId string) {
 	_, ok := session.consumers.Load(consumerId)
 	if ok {
+		nazalog.Info("RemoveConsumer, consumerId:", consumerId)
 		session.consumers.Delete(consumerId)
 	}
 }

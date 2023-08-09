@@ -1,12 +1,9 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"lalmax/hook"
-	"lalmax/rtc"
-	"lalmax/srt"
+	"lalmax/server"
 	"os"
 
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -15,7 +12,6 @@ import (
 
 	config "lalmax/conf"
 
-	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/bininfo"
 )
 
@@ -31,38 +27,14 @@ func main() {
 
 	maxConf := config.GetConfig()
 
-	lals := logic.NewLalServer(func(option *logic.Option) {
-		option.ConfFilename = maxConf.LalSvrConfigPath
-	})
-
-	// 在常规lalserver基础上增加这行，用于演示hook lalserver中的流
-	lals.WithOnHookSession(func(uniqueKey string, streamName string) logic.ICustomizeHookSessionContext {
-		// 有新的流了，创建业务层的对象，用于hook这个流
-		return hook.NewHookSession(uniqueKey, streamName)
-	})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	if maxConf.SrtConfig.Enable {
-		go func() {
-			srtSvr := srt.NewSrtServer(maxConf.SrtConfig.Host, maxConf.SrtConfig.Port, lals, func(option *srt.SrtOption) {
-				option.Latency = 300
-				option.PeerLatency = 300
-			})
-			srtSvr.Run(ctx)
-		}()
+	svr, err := server.NewLalMaxServer(maxConf)
+	if err != nil {
+		nazalog.Fatalf("create lalmax server failed. err=%+v", err)
 	}
 
-	if maxConf.RtcConfig.Enable {
-		go func() {
-			rtcSvr := rtc.NewRtcServer(maxConf.RtcConfig, lals)
-			rtcSvr.Run()
-		}()
+	if err = svr.Run(); err != nil {
+		nazalog.Infof("server manager done. err=%+v", err)
 	}
-
-	err = lals.RunLoop()
-	nazalog.Infof("server manager done. err=%+v", err)
 }
 
 func parseFlag() string {
