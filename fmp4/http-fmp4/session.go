@@ -213,7 +213,6 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 		return
 	}
 	session.hooks.AddConsumer(session.subscriberId, session)
-	defer session.hooks.RemoveConsumer(session.subscriberId)
 	connCloseErr := make(chan error, 1)
 	go func() {
 		readBuf := make([]byte, 1024)
@@ -221,6 +220,7 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 			connCloseErr <- err
 		}
 	}()
+
 	session.muxer.WriteInitSegment(conn)
 	for {
 		writeFragment := func(data []byte) error {
@@ -272,6 +272,7 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 			}
 		case <-connCloseErr:
 			session.OnStop()
+			return
 		}
 	}
 
