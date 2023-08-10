@@ -54,11 +54,11 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 	}
 
 	maxsvr.router = gin.Default()
+	maxsvr.InitRouter(maxsvr.router)
 	if conf.HttpConfig.EnableHttps {
 		maxsvr.routerTls = gin.Default()
+		maxsvr.InitRouter(maxsvr.routerTls)
 	}
-
-	maxsvr.InitRouter()
 
 	return maxsvr, nil
 }
