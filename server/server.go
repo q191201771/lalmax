@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	config "lalmax/conf"
 	httpfmp4 "lalmax/fmp4/http-fmp4"
 	"lalmax/hook"
 	"lalmax/rtc"
 	"lalmax/srt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/logic"
@@ -79,7 +81,8 @@ func (s *LalMaxServer) Run() (err error) {
 	go s.router.Run(s.conf.HttpConfig.ListenAddr)
 
 	if s.conf.HttpConfig.EnableHttps {
-		go s.routerTls.RunTLS(s.conf.HttpConfig.HttpsListenAddr, s.conf.HttpConfig.HttpsCertFile, s.conf.HttpConfig.HttpsKeyFile)
+		server := &http.Server{Addr: s.conf.HttpConfig.HttpsListenAddr, Handler: s.routerTls, TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){}}
+		go server.ListenAndServeTLS(s.conf.HttpConfig.HttpsCertFile, s.conf.HttpConfig.HttpsKeyFile)
 	}
 
 	return s.lalsvr.RunLoop()
