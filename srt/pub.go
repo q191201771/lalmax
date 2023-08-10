@@ -3,10 +3,8 @@ package srt
 import (
 	"bufio"
 	"context"
-	"errors"
 
 	srt "github.com/datarhei/gosrt"
-	"github.com/haivision/srtgo"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -83,13 +81,9 @@ func (p *Publisher) Run() {
 
 		err := p.demuxer.Input(bufio.NewReader(p.conn))
 		if err != nil {
-			if errors.Is(err, srtgo.EConnLost) {
-				nazalog.Infof("stream [%s] disconnected", p.streamName)
-				p.srv.Remove(p.streamName, p.ss)
-				break
-			} else {
-				nazalog.Error(err)
-			}
+			nazalog.Infof("stream [%s] disconnected", p.streamName)
+			p.srv.Remove(p.streamName, p.ss)
+			break
 		}
 	}
 }
