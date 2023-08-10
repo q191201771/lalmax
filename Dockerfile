@@ -2,11 +2,6 @@ FROM golang:1.18.9
 ENV GOPROXY=https://goproxy.cn,https://goproxy.io,direct
 LABEL maintainer="Kevin Zang"
 
-RUN apt-get -y update
-RUN apt-get -y upgrade
-RUN apt-get -y install sudo tclsh cmake libssl-dev pkg-config build-essential
-
-
 WORKDIR /code
 COPY . .
 RUN /bin/bash ./build.sh
