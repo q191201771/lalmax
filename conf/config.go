@@ -17,8 +17,7 @@ type Config struct {
 
 type SrtConfig struct {
 	Enable bool   `json:"enable"` // srt服务使能配置
-	Host   string `json:"host"`   // srt服务监听host
-	Port   uint16 `json:"port"`   // srt服务监听端口
+	Addr   string `json:"addr"`   // srt服务监听地址
 }
 
 type RtcConfig struct {

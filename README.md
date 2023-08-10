@@ -50,7 +50,7 @@ docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 
 具体的拉流url地址见https://pengrl.com/lal/#/streamurllist（除了srt/whep）
 
 ## [SRT](./document/srt.md)
-（1）SRT推拉流依赖libsrt库,run.sh中有编译libsrt，如果run.sh无法编译libsrt，需要自己另行编译libsrt
+（1）使用gosrt库
 
 （2）暂时不支持SRT加密
 
@@ -59,10 +59,10 @@ docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 
 （4）可以对接OBS/VLC
 
 推流url
-srt://127.0.0.1:6001?streamid=#!::r=test110,m=publish
+srt://127.0.0.1:6001?streamid=publish:test110
 
 拉流url
-srt://127.0.0.1:6001?streamid=#!::r=test110,m=request
+srt://127.0.0.1:6001?streamid=test110
 
 ## [WebRTC](./document/rtc.md)
 （1）支持WHIP推流和WHEP拉流,暂时只支持POST信令

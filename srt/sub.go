@@ -4,7 +4,7 @@ import (
 	"context"
 	"lalmax/hook"
 
-	"github.com/haivision/srtgo"
+	srt "github.com/datarhei/gosrt"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazalog"
 	uuid "github.com/satori/go.uuid"
@@ -15,7 +15,7 @@ import (
 
 type Subscriber struct {
 	ctx               context.Context
-	socket            *srtgo.SrtSocket
+	conn              srt.Conn
 	streamName        string
 	muxer             *ts.TSMuxer
 	hasInit           bool
@@ -29,11 +29,11 @@ type Subscriber struct {
 	maxSendPacketSize int
 }
 
-func NewSubscriber(ctx context.Context, socket *srtgo.SrtSocket, streamName string, maxSendPacketSize int) *Subscriber {
+func NewSubscriber(ctx context.Context, conn srt.Conn, streamName string, maxSendPacketSize int) *Subscriber {
 
 	sub := &Subscriber{
 		ctx:               ctx,
-		socket:            socket,
+		conn:              conn,
 		streamName:        streamName,
 		muxer:             ts.NewTSMuxer(),
 		subscriberId:      uuid.NewV4().String(),
@@ -55,7 +55,7 @@ func (s *Subscriber) Run() {
 			defer func() {
 				if err != nil {
 					nazalog.Info("close srt socket")
-					s.socket.Close()
+					s.conn.Close()
 				}
 
 			}()
@@ -66,7 +66,7 @@ func (s *Subscriber) Run() {
 			default:
 			}
 			if len(sendBuf) > (s.maxSendPacketSize-1)*ts.TS_PAKCET_SIZE {
-				if _, err = s.socket.Write(sendBuf); err != nil {
+				if _, err = s.conn.Write(sendBuf); err != nil {
 					session.RemoveConsumer(s.subscriberId)
 					return
 				}
@@ -77,7 +77,7 @@ func (s *Subscriber) Run() {
 		}
 	} else {
 		nazalog.Warnf("not found hook session, streamName:%s", s.streamName)
-		s.socket.Close()
+		s.conn.Close()
 	}
 }
 
@@ -150,5 +150,5 @@ func (s *Subscriber) OnMsg(msg base.RtmpMsg) {
 
 func (s *Subscriber) OnStop() {
 	nazalog.Info("srt subscriber onStop")
-	s.socket.Close()
+	s.conn.Close()
 }

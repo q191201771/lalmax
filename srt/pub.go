@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 
+	srt "github.com/datarhei/gosrt"
 	"github.com/haivision/srtgo"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
@@ -19,16 +20,16 @@ type Publisher struct {
 	ss          logic.ICustomizePubSessionContext
 	streamName  string
 	demuxer     *ts.TSDemuxer
-	socket      *srtgo.SrtSocket
+	conn        srt.Conn
 	subscribers []*Subscriber
 }
 
-func NewPublisher(ctx context.Context, streamName string, socket *srtgo.SrtSocket, srv *SrtServer) *Publisher {
+func NewPublisher(ctx context.Context, conn srt.Conn, streamName string, srv *SrtServer) *Publisher {
 	pub := &Publisher{
 		ctx:        ctx,
 		srv:        srv,
 		streamName: streamName,
-		socket:     socket,
+		conn:       conn,
 		demuxer:    ts.NewTSDemuxer(),
 	}
 
@@ -41,7 +42,7 @@ func (p *Publisher) SetSession(session logic.ICustomizePubSessionContext) {
 }
 
 func (p *Publisher) Run() {
-	defer p.socket.Close()
+	defer p.conn.Close()
 
 	var foundAudio bool
 	p.demuxer.OnFrame = func(cid ts.TS_STREAM_TYPE, frame []byte, pts uint64, dts uint64) {
@@ -80,7 +81,7 @@ func (p *Publisher) Run() {
 		default:
 		}
 
-		err := p.demuxer.Input(bufio.NewReader(p.socket))
+		err := p.demuxer.Input(bufio.NewReader(p.conn))
 		if err != nil {
 			if errors.Is(err, srtgo.EConnLost) {
 				nazalog.Infof("stream [%s] disconnected", p.streamName)
