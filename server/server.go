@@ -34,7 +34,7 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 	}
 
 	if conf.SrtConfig.Enable {
-		maxsvr.srtsvr = srt.NewSrtServer(conf.SrtConfig.Host, conf.SrtConfig.Port, lalsvr, func(option *srt.SrtOption) {
+		maxsvr.srtsvr = srt.NewSrtServer(conf.SrtConfig.Addr, lalsvr, func(option *srt.SrtOption) {
 			option.Latency = 300
 			option.PeerLatency = 300
 		})

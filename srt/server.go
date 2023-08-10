@@ -1,23 +1,18 @@
 package srt
 
-// #cgo LDFLAGS: -lsrt
-// #include <srt/srt.h>
-import "C"
 import (
 	"context"
-	"net"
-	"strconv"
 	"strings"
+	"time"
 
-	"github.com/haivision/srtgo"
+	srt "github.com/datarhei/gosrt"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
 )
 
 type SrtServer struct {
-	host      string
-	port      uint16
+	addr      string
 	lalServer logic.ILalServer
 	srtOpt    SrtOption
 }
@@ -25,8 +20,8 @@ type SrtOption struct {
 	Latency           int
 	RecvLatency       int
 	PeerLatency       int
-	TlpktDrop         int
-	TsbpdMode         int
+	TlpktDrop         bool
+	TsbpdMode         bool
 	RecvBuf           int
 	SendBuf           int
 	MaxSendPacketSize int
@@ -36,8 +31,8 @@ var defaultSrtOption = SrtOption{
 	Latency:           300,
 	RecvLatency:       300,
 	PeerLatency:       300,
-	TlpktDrop:         1,
-	TsbpdMode:         1,
+	TlpktDrop:         true,
+	TsbpdMode:         true,
 	RecvBuf:           2 * 1024 * 1024,
 	SendBuf:           2 * 1024 * 1024,
 	MaxSendPacketSize: 4,
@@ -45,42 +40,39 @@ var defaultSrtOption = SrtOption{
 
 type ModSrtOption func(option *SrtOption)
 
-func NewSrtServer(host string, port uint16, lal logic.ILalServer, modOptions ...ModSrtOption) *SrtServer {
+func NewSrtServer(addr string, lal logic.ILalServer, modOptions ...ModSrtOption) *SrtServer {
 	opt := defaultSrtOption
 	for _, fn := range modOptions {
 		fn(&opt)
 	}
 	svr := &SrtServer{
-		host:      host,
-		port:      port,
+		addr:      addr,
 		lalServer: lal,
 		srtOpt:    opt,
 	}
 
-	nazalog.Infof("create srt server. host:%s, port:%d", svr.host, svr.port)
+	nazalog.Info("create srt server")
 	return svr
 }
 
 func (s *SrtServer) Run(ctx context.Context) {
-	options := make(map[string]string)
-	options["blocking"] = "0"
-	options["transtype"] = "live"
-	options["latency"] = strconv.Itoa(s.srtOpt.Latency)
-	options["rcvlatency"] = strconv.Itoa(s.srtOpt.RecvLatency)
-	options["peerlatency"] = strconv.Itoa(s.srtOpt.PeerLatency)
-	options["tlpktdrop"] = strconv.Itoa(s.srtOpt.TlpktDrop)
-	options["tsbpdmode"] = strconv.Itoa(s.srtOpt.TsbpdMode)
-	options["sndbuf"] = strconv.Itoa(s.srtOpt.SendBuf)
-	options["rcvbuf"] = strconv.Itoa(s.srtOpt.RecvBuf)
+	conf := srt.DefaultConfig()
+	conf.Latency = time.Millisecond * time.Duration(s.srtOpt.Latency)
+	conf.ReceiverLatency = time.Millisecond * time.Duration(s.srtOpt.RecvLatency)
+	conf.PeerLatency = time.Millisecond * time.Duration(s.srtOpt.PeerLatency)
+	conf.TooLatePacketDrop = s.srtOpt.TlpktDrop
+	conf.TSBPDMode = s.srtOpt.TsbpdMode
+	conf.SendBufferSize = uint32(s.srtOpt.SendBuf)
+	conf.ReceiverBufferSize = uint32(s.srtOpt.RecvBuf)
 
-	sck := srtgo.NewSrtSocket(s.host, s.port, options)
-	defer sck.Close()
-
-	sck.SetSockOptInt(srtgo.SRTO_LOSSMAXTTL, srtgo.SRTO_LOSSMAXTTL)
-	sck.SetListenCallback(s.listenCallback)
-	if err := sck.Listen(128); err != nil {
+	srtlistener, err := srt.Listen("srt", s.addr, conf)
+	if err != nil {
 		panic(err)
 	}
+
+	defer srtlistener.Close()
+
+	nazalog.Info("srt server listen addr:", s.addr)
 
 	for {
 		select {
@@ -89,84 +81,57 @@ func (s *SrtServer) Run(ctx context.Context) {
 		default:
 
 		}
-		socket, addr, err := sck.Accept()
+
+		var streamid string
+		conn, mode, err := srtlistener.Accept(func(req srt.ConnRequest) srt.ConnType {
+			streamid = req.StreamId()
+
+			// currently it's the same to return SUBSCRIBE or PUBLISH
+			return srt.SUBSCRIBE
+		})
+
 		if err != nil {
-			nazalog.Error(err)
+			// rejected connection, ignore
+			continue
 		}
 
-		go s.Handle(ctx, socket, addr)
+		if mode == srt.REJECT {
+			// rejected connection, ignore
+			continue
+		}
+
+		// gosrt的mode不好用
+		if strings.HasPrefix(streamid, "publish:") {
+			// 推流模式
+			streamid = strings.TrimLeft(streamid, "publish:")
+			go s.handlePublish(ctx, conn, streamid)
+		} else {
+			// 拉流模式
+			go s.handleSubcribe(ctx, conn, streamid)
+		}
 	}
 }
 
-func (s *SrtServer) Handle(ctx context.Context, socket *srtgo.SrtSocket, addr *net.UDPAddr) {
-	var (
-		err      error
-		streamid *StreamID
-	)
-
-	idString, err := socket.GetSockOptString(C.SRTO_STREAMID)
+func (s *SrtServer) handlePublish(ctx context.Context, conn srt.Conn, streamid string) {
+	publisher := NewPublisher(ctx, conn, streamid, s)
+	session, err := s.lalServer.AddCustomizePubSession(streamid)
 	if err != nil {
 		nazalog.Error(err)
-		return
 	}
 
-	if streamid, err = parseStreamID(idString); err != nil {
-		nazalog.Error(err)
-		return
+	if session != nil {
+		session.WithOption(func(option *base.AvPacketStreamOption) {
+			option.VideoFormat = base.AvPacketStreamVideoFormatAnnexb
+		})
 	}
 
-	// https://github.com/Haivision/srt/blob/master/docs/features/access-control.md
-	switch streamid.Mode {
-	case "publish", "PUBLISH":
-		// make a new publisher
-		publisher := NewPublisher(ctx, streamid.Resource, socket, s)
-		session, err := s.lalServer.AddCustomizePubSession(streamid.Resource)
-		if err != nil {
-			nazalog.Error(err)
-		}
-
-		if session != nil {
-			session.WithOption(func(option *base.AvPacketStreamOption) {
-				option.VideoFormat = base.AvPacketStreamVideoFormatAnnexb
-			})
-		}
-
-		publisher.SetSession(session)
-		publisher.Run()
-	case "request", "REQUEST":
-		// make a new subscriber
-		subscriber := NewSubscriber(ctx, socket, streamid.Resource, s.srtOpt.MaxSendPacketSize)
-		subscriber.Run()
-	default:
-		return
-	}
+	publisher.SetSession(session)
+	publisher.Run()
 }
 
-func (s *SrtServer) listenCallback(socket *srtgo.SrtSocket, version int, addr *net.UDPAddr, streamid string) bool {
-	nazalog.Infof("socket will connect, hsVersion: %d, streamid: %s\n", version, streamid)
-
-	if !strings.Contains(streamid, "#!::") {
-		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
-		return false
-	}
-
-	id, err := parseStreamID(streamid)
-	if err != nil {
-		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
-		return false
-	}
-	if id.Resource == "" {
-		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
-		return false
-	}
-	// check the other stream parameters
-
-	if id.Mode == "" {
-		socket.SetRejectReason(srtgo.RejectionReasonBadRequest)
-		return false
-	}
-
-	return true
+func (s *SrtServer) handleSubcribe(ctx context.Context, conn srt.Conn, streamid string) {
+	subscriber := NewSubscriber(ctx, conn, streamid, s.srtOpt.MaxSendPacketSize)
+	subscriber.Run()
 }
 
 func (s *SrtServer) Remove(host string, ss logic.ICustomizePubSessionContext) {
