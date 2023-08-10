@@ -3,6 +3,12 @@ package httpfmp4
 import (
 	"errors"
 	"fmt"
+	"io"
+	"lalmax/hook"
+	"net"
+	"net/http"
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/avc"
@@ -13,11 +19,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-mp4"
-	"io"
-	"lalmax/hook"
-	"net"
-	"net/http"
-	"strings"
 )
 
 type fmp4WriterSeeker struct {
@@ -145,14 +146,15 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 				nazalog.Error("ParseVpsSpsPpsFromSeqHeaderWithoutMalloc failed, err:", err)
 				break
 			}
-			spspps := make([]byte, len(session.spspps))
-			copy(spspps, session.spspps)
+
 			session.spspps, err = hevc.BuildVpsSpsPps2Annexb(vps, sps, pps)
 			if err != nil {
 				nazalog.Error("BuildVpsSpsPps2Annexb failed, err:", err)
 				break
 			}
 
+			spspps := make([]byte, len(session.spspps))
+			copy(spspps, session.spspps)
 			session.muxer.Write(session.videoTrakId, session.spspps, uint64(videoHeader.Pts()), uint64(videoHeader.Dts()))
 		default:
 			nazalog.Error("unsupport video codec:", codec)
