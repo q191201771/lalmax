@@ -3,11 +3,6 @@ package httpfmp4
 import (
 	"errors"
 	"fmt"
-	"io"
-	"lalmax/hook"
-	"net/http"
-	"strings"
-
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/avc"
@@ -18,6 +13,11 @@ import (
 	uuid "github.com/satori/go.uuid"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-mp4"
+	"io"
+	"lalmax/hook"
+	"net"
+	"net/http"
+	"strings"
 )
 
 type fmp4WriterSeeker struct {
@@ -120,7 +120,6 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 
 	session.hooks = hooksession
 	session.w = c.Writer
-
 	videoHeader := hooksession.GetVideoSeqHeaderMsg()
 	if videoHeader != nil {
 		codec := videoHeader.VideoCodecId()
@@ -134,7 +133,9 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 			}
 
 			session.spspps = avc.BuildSpsPps2Annexb(sps, pps)
-			session.muxer.Write(session.videoTrakId, session.spspps, uint64(videoHeader.Pts()), uint64(videoHeader.Dts()))
+			spspps := make([]byte, len(session.spspps))
+			copy(spspps, session.spspps)
+			session.muxer.Write(session.videoTrakId, spspps, uint64(videoHeader.Pts()), uint64(videoHeader.Dts()))
 
 		case base.RtmpCodecIdHevc:
 			session.videoTrakId = session.muxer.AddVideoTrack(mp4.MP4_CODEC_H265)
@@ -144,7 +145,8 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 				nazalog.Error("ParseVpsSpsPpsFromSeqHeaderWithoutMalloc failed, err:", err)
 				break
 			}
-
+			spspps := make([]byte, len(session.spspps))
+			copy(spspps, session.spspps)
 			session.spspps, err = hevc.BuildVpsSpsPps2Annexb(vps, sps, pps)
 			if err != nil {
 				nazalog.Error("BuildVpsSpsPps2Annexb failed, err:", err)
@@ -187,21 +189,42 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 		c.Status(http.StatusNotFound)
 		return
 	}
-
 	c.Header("Content-Type", "video/mp4")
-	c.Status(http.StatusOK)
+	c.Header("Connection", "close")
+	c.Header("Expires", "-1")
+	h, ok := session.w.(http.Hijacker)
+	if !ok {
+		nazalog.Error("gin response does not implement http.Hijacker")
+		return
+	}
 
+	conn, bio, err := h.Hijack()
+	if err != nil {
+		nazalog.Errorf("hijack failed. err=%+v", err)
+		return
+	}
+	if bio.Reader.Buffered() != 0 || bio.Writer.Buffered() != 0 {
+		nazalog.Errorf("hijack but buffer not empty. rb=%d, wb=%d", bio.Reader.Buffered(), bio.Writer.Buffered())
+	}
+	if err = session.writeHttpHeader(conn, session.w.Header()); err != nil {
+		nazalog.Errorf("session writeHttpHeader. err=%+v", err)
+		return
+	}
 	session.hooks.AddConsumer(session.subscriberId, session)
 	defer session.hooks.RemoveConsumer(session.subscriberId)
-
-	session.muxer.WriteInitSegment(session.w)
+	connCloseErr := make(chan error, 1)
+	go func() {
+		readBuf := make([]byte, 1024)
+		if _, err = conn.Read(readBuf); err != nil {
+			connCloseErr <- err
+		}
+	}()
+	session.muxer.WriteInitSegment(conn)
 	for {
 		writeFragment := func(data []byte) error {
-			if _, err := session.w.Write(data); err != nil {
+			if _, err = conn.Write(data); err != nil {
 				return err
 			}
-			session.w.Flush()
-
 			return nil
 		}
 
@@ -217,7 +240,7 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 
 				session.muxer.Write(session.audioTrakId, pkt.Payload, uint64(pts), uint64(dts))
 				session.muxer.FlushFragment()
-				err := writeFragment(session.fws.buffer)
+				err = writeFragment(session.fws.buffer)
 				if err != nil {
 					return
 				}
@@ -236,7 +259,7 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 				session.muxer.Write(session.videoTrakId, pkt.Payload, uint64(pts), uint64(dts))
 				session.muxer.FlushFragment()
 
-				err := writeFragment(session.fws.buffer)
+				err = writeFragment(session.fws.buffer)
 				if err != nil {
 					return
 				}
@@ -245,11 +268,34 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 				session.muxer.ReBindWriter(fws)
 				session.fws = fws
 			}
+		case <-connCloseErr:
+			session.OnStop()
 		}
 	}
 
 }
-
+func (session *HttpFmp4Session) writeHttpHeader(conn net.Conn, header http.Header) error {
+	p := make([]byte, 0, 1024)
+	p = append(p, []byte("HTTP/1.1 200 OK\r\n")...)
+	for k, vs := range header {
+		for _, v := range vs {
+			p = append(p, k...)
+			p = append(p, ": "...)
+			for i := 0; i < len(v); i++ {
+				b := v[i]
+				if b <= 31 {
+					// prevent response splitting.
+					b = ' '
+				}
+				p = append(p, b)
+			}
+			p = append(p, "\r\n"...)
+		}
+	}
+	p = append(p, "\r\n"...)
+	_, err := conn.Write(p)
+	return err
+}
 func (session *HttpFmp4Session) OnMsg(msg base.RtmpMsg) {
 	switch msg.Header.MsgTypeId {
 	case base.RtmpTypeIdMetadata:
@@ -274,7 +320,7 @@ func (session *HttpFmp4Session) VideoMsg2AvPacket(msg base.RtmpMsg) {
 
 	var out []byte
 	var vps, sps, pps []byte
-	appendSpsppsFlag := false
+	//appendSpsppsFlag := false
 	h2645.IterateNaluAvcc(msg.Payload[5:], func(nal []byte) {
 		nalType := h2645.ParseNaluType(isH264, nal[0])
 
@@ -291,10 +337,10 @@ func (session *HttpFmp4Session) VideoMsg2AvPacket(msg base.RtmpMsg) {
 					session.spspps = append(session.spspps, pps...)
 				}
 			} else if nalType == h2645.H264NaluTypeIdrSlice {
-				if !appendSpsppsFlag {
-					out = append(out, session.spspps...)
-					appendSpsppsFlag = true
-				}
+				//if !appendSpsppsFlag {
+				//	out = append(out, session.spspps...)
+				//	appendSpsppsFlag = true
+				//}
 
 				out = append(out, h2645.NaluStartCode4...)
 				out = append(out, nal...)
@@ -321,10 +367,10 @@ func (session *HttpFmp4Session) VideoMsg2AvPacket(msg base.RtmpMsg) {
 					session.spspps = append(session.spspps, pps...)
 				}
 			} else if h2645.H265IsIrapNalu(nalType) {
-				if !appendSpsppsFlag {
-					out = append(out, session.spspps...)
-					appendSpsppsFlag = true
-				}
+				//if !appendSpsppsFlag {
+				//	out = append(out, session.spspps...)
+				//	appendSpsppsFlag = true
+				//}
 
 				out = append(out, h2645.NaluStartCode4...)
 				out = append(out, nal...)
