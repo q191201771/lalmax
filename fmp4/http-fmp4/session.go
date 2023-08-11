@@ -3,11 +3,12 @@ package httpfmp4
 import (
 	"errors"
 	"fmt"
+	"github.com/q191201771/naza/pkg/connection"
 	"io"
 	"lalmax/hook"
-	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/aac"
@@ -22,6 +23,11 @@ import (
 )
 
 var ErrWriteChanFull = errors.New("Fmp4  Session write channel full")
+var (
+	readBufSize = 4096 //  session connection读缓冲的大小
+	wChanSize   = 256  //  session 发送数据时，channel 的大小
+	bufCapacity = 1024 * 1024
+)
 
 type fmp4WriterSeeker struct {
 	buffer []byte
@@ -86,7 +92,6 @@ type HttpFmp4Session struct {
 	subscriberId string
 	spspps       []byte
 	asc          []byte
-	avPacketChan chan Frame
 	audioTrakId  uint32
 	videoTrakId  uint32
 	w            gin.ResponseWriter
@@ -94,7 +99,8 @@ type HttpFmp4Session struct {
 	fws          *fmp4WriterSeeker
 	initVideoDts uint32
 	initAudioDts uint32
-	connCloseErr chan error
+	conn         connection.Connection
+	disposeOnce  sync.Once
 }
 
 func NewHttpFmp4Session(streamid string) *HttpFmp4Session {
@@ -103,9 +109,7 @@ func NewHttpFmp4Session(streamid string) *HttpFmp4Session {
 	session := &HttpFmp4Session{
 		streamid:     streamid,
 		subscriberId: uuid.NewV4().String(),
-		avPacketChan: make(chan Frame, 144),
-		fws:          newFmp4WriterSeeker(1024 * 1024),
-		connCloseErr: make(chan error, 1),
+		fws:          newFmp4WriterSeeker(bufCapacity),
 	}
 
 	session.muxer, _ = mp4.CreateMp4Muxer(session.fws, mp4.WithMp4Flag(mp4.MP4_FLAG_FRAGMENT))
@@ -114,7 +118,21 @@ func NewHttpFmp4Session(streamid string) *HttpFmp4Session {
 
 	return session
 }
-
+func (session *HttpFmp4Session) Dispose() error {
+	return session.dispose()
+}
+func (session *HttpFmp4Session) dispose() error {
+	var retErr error
+	session.disposeOnce.Do(func() {
+		session.OnStop()
+		if session.conn == nil {
+			retErr = base.ErrSessionNotStarted
+			return
+		}
+		retErr = session.conn.Close()
+	})
+	return retErr
+}
 func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 	ok, hooksession := hook.GetHookSessionManagerInstance().GetHookSession(session.streamid)
 	if !ok {
@@ -212,76 +230,65 @@ func (session *HttpFmp4Session) handleSession(c *gin.Context) {
 	if bio.Reader.Buffered() != 0 || bio.Writer.Buffered() != 0 {
 		nazalog.Errorf("hijack but buffer not empty. rb=%d, wb=%d", bio.Reader.Buffered(), bio.Writer.Buffered())
 	}
-	if err = session.writeHttpHeader(conn, session.w.Header()); err != nil {
+	session.conn = connection.New(conn, func(option *connection.Option) {
+		option.ReadBufSize = readBufSize
+		option.WriteChanSize = wChanSize
+	})
+	if err = session.writeHttpHeader(session.w.Header()); err != nil {
 		nazalog.Errorf("session writeHttpHeader. err=%+v", err)
 		return
 	}
 	session.hooks.AddConsumer(session.subscriberId, session)
-	go func() {
-		readBuf := make([]byte, 1024)
-		if _, err = conn.Read(readBuf); err != nil {
-			session.connCloseErr <- err
-		}
-	}()
+	session.muxer.WriteInitSegment(session.conn)
 
-	session.muxer.WriteInitSegment(conn)
-	for {
-		writeFragment := func(data []byte) error {
-			if _, err = conn.Write(data); err != nil {
-				return err
-			}
-			return nil
+	readBuf := make([]byte, 1024)
+	_, err = session.conn.Read(readBuf)
+	session.dispose()
+}
+
+func (session *HttpFmp4Session) interleavedWrite(pkt Frame) (err error) {
+	if pkt.PayloadType == base.AvPacketPtAac || pkt.PayloadType == base.AvPacketPtG711A || pkt.PayloadType == base.AvPacketPtG711U {
+		if session.initAudioDts == 0 {
+			session.initAudioDts = pkt.Dts
 		}
 
-		select {
-		case pkt := <-session.avPacketChan:
-			if pkt.PayloadType == base.AvPacketPtAac || pkt.PayloadType == base.AvPacketPtG711A || pkt.PayloadType == base.AvPacketPtG711U {
-				if session.initAudioDts == 0 {
-					session.initAudioDts = pkt.Dts
-				}
+		dts := pkt.Dts - session.initAudioDts
+		pts := dts
 
-				dts := pkt.Dts - session.initAudioDts
-				pts := dts
-
-				session.muxer.Write(session.audioTrakId, pkt.Payload, uint64(pts), uint64(dts))
-				session.muxer.FlushFragment()
-				err = writeFragment(session.fws.buffer)
-				if err != nil {
-					return
-				}
-
-				fws := newFmp4WriterSeeker(1024 * 1024)
-				session.muxer.ReBindWriter(fws)
-				session.fws = fws
-			} else if pkt.PayloadType == base.AvPacketPtAvc || pkt.PayloadType == base.AvPacketPtHevc {
-				if session.initVideoDts == 0 {
-					session.initVideoDts = pkt.Dts
-				}
-
-				dts := pkt.Dts - session.initVideoDts
-				pts := dts + pkt.Cts
-
-				session.muxer.Write(session.videoTrakId, pkt.Payload, uint64(pts), uint64(dts))
-				session.muxer.FlushFragment()
-
-				err = writeFragment(session.fws.buffer)
-				if err != nil {
-					return
-				}
-
-				fws := newFmp4WriterSeeker(1024 * 1024)
-				session.muxer.ReBindWriter(fws)
-				session.fws = fws
-			}
-		case err := <-session.connCloseErr:
-			nazalog.Errorf("fmp4 conn recv err:%s", err.Error())
-			session.OnStop()
+		session.muxer.Write(session.audioTrakId, pkt.Payload, uint64(pts), uint64(dts))
+		session.muxer.FlushFragment()
+		err = session.write(session.fws.buffer)
+		if err != nil {
 			return
 		}
-	}
 
+		fws := newFmp4WriterSeeker(bufCapacity)
+		session.muxer.ReBindWriter(fws)
+		session.fws = fws
+	} else if pkt.PayloadType == base.AvPacketPtAvc || pkt.PayloadType == base.AvPacketPtHevc {
+		if session.initVideoDts == 0 {
+			session.initVideoDts = pkt.Dts
+		}
+
+		dts := pkt.Dts - session.initVideoDts
+		pts := dts + pkt.Cts
+
+		session.muxer.Write(session.videoTrakId, pkt.Payload, uint64(pts), uint64(dts))
+		session.muxer.FlushFragment()
+
+		err = session.write(session.fws.buffer)
+		if err != nil {
+			return
+		}
+
+		fws := newFmp4WriterSeeker(bufCapacity)
+		session.muxer.ReBindWriter(fws)
+		session.fws = fws
+	}
+	return
 }
-func (session *HttpFmp4Session) writeHttpHeader(conn net.Conn, header http.Header) error {
+
+func (session *HttpFmp4Session) writeHttpHeader(header http.Header) error {
 	p := make([]byte, 0, 1024)
 	p = append(p, []byte("HTTP/1.1 200 OK\r\n")...)
 	for k, vs := range header {
@@ -300,7 +307,13 @@ func (session *HttpFmp4Session) writeHttpHeader(conn net.Conn, header http.Heade
 		}
 	}
 	p = append(p, "\r\n"...)
-	_, err := conn.Write(p)
+
+	return session.write(p)
+}
+func (session *HttpFmp4Session) write(buf []byte) (err error) {
+	if session.conn != nil {
+		_, err = session.conn.Write(buf)
+	}
 	return err
 }
 func (session *HttpFmp4Session) OnMsg(msg base.RtmpMsg) {
@@ -401,19 +414,7 @@ func (session *HttpFmp4Session) VideoMsg2AvPacket(msg base.RtmpMsg) {
 		} else {
 			pkt.PayloadType = base.AvPacketPtHevc
 		}
-		select {
-		case session.avPacketChan <- pkt:
-		default:
-			//session.avPacketChan 满了直接退出,防止阻塞
-			if session.connCloseErr != nil {
-				select {
-				case session.connCloseErr <- ErrWriteChanFull:
-				default:
-
-				}
-			}
-		}
-
+		session.interleavedWrite(pkt)
 	}
 }
 
@@ -449,18 +450,7 @@ func (session *HttpFmp4Session) AudioMsg2AvPacket(msg base.RtmpMsg) {
 			Cts:         msg.Cts(),
 			Payload:     out,
 		}
-		select {
-		case session.avPacketChan <- pkt:
-		default:
-			//session.avPacketChan 满了直接退出,防止阻塞
-			if session.connCloseErr != nil {
-				select {
-				case session.connCloseErr <- ErrWriteChanFull:
-				default:
+		session.interleavedWrite(pkt)
 
-				}
-
-			}
-		}
 	}
 }
