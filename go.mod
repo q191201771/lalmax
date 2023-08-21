@@ -4,12 +4,14 @@ go 1.18
 
 require (
 	github.com/aler9/gortsplib/v2 v2.2.2
-	github.com/bluenviron/gortsplib/v3 v3.7.0
+	github.com/bluenviron/gohlslib v1.0.0
+	github.com/bluenviron/gortsplib/v3 v3.10.0
+	github.com/bluenviron/mediacommon v1.0.0
 	github.com/datarhei/gosrt v0.5.4
 	github.com/gin-gonic/gin v1.9.1
 	github.com/pion/ice/v2 v2.3.6
 	github.com/pion/interceptor v0.1.17
-	github.com/pion/rtp v1.7.13
+	github.com/pion/rtp v1.8.1
 	github.com/pion/webrtc/v3 v3.2.8
 	github.com/q191201771/lal v0.35.41
 	github.com/q191201771/naza v0.30.12
@@ -18,8 +20,11 @@ require (
 )
 
 require (
+	github.com/abema/go-mp4 v0.12.0 // indirect
+	github.com/aler9/writerseeker v1.1.0 // indirect
+	github.com/asticode/go-astikit v0.30.0 // indirect
+	github.com/asticode/go-astits v1.13.0 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
-	github.com/bluenviron/mediacommon v0.5.1 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -55,9 +60,11 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
+	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/bluenviron/gohlslib => /Users/zangshouchi/work/gohlslib

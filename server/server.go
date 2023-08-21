@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	config "lalmax/conf"
+	"lalmax/fmp4/hls"
 	httpfmp4 "lalmax/fmp4/http-fmp4"
 	"lalmax/hook"
 	"lalmax/rtc"
@@ -23,6 +24,7 @@ type LalMaxServer struct {
 	router      *gin.Engine
 	routerTls   *gin.Engine
 	httpfmp4svr *httpfmp4.HttpFmp4Server
+	hlssvr      *hls.HlsServer
 }
 
 func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
@@ -55,6 +57,10 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 		maxsvr.httpfmp4svr = httpfmp4.NewHttpFmp4Server()
 	}
 
+	if conf.HlsConfig.Enable {
+		maxsvr.hlssvr = hls.NewHlsServer(conf.HlsConfig)
+	}
+
 	maxsvr.router = gin.Default()
 	maxsvr.InitRouter(maxsvr.router)
 	if conf.HttpConfig.EnableHttps {
@@ -68,7 +74,7 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 func (s *LalMaxServer) Run() (err error) {
 	s.lalsvr.WithOnHookSession(func(uniqueKey string, streamName string) logic.ICustomizeHookSessionContext {
 		// 有新的流了，创建业务层的对象，用于hook这个流
-		return hook.NewHookSession(uniqueKey, streamName)
+		return hook.NewHookSession(uniqueKey, streamName, s.hlssvr)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

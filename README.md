@@ -38,13 +38,17 @@ docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 
 
 (3) RTMP
 
-(4) HLS(S)
+(4) HLS(S)-TS
 
 (5) HTTP(S)-FLV
 
 (6) HTTP(S)-TS
 
 (7) RTC(WHEP)
+
+(8) HTTP(S)-FMP4
+
+(9) HLS(S)-FMP4/LLHLS
 
 
 具体的拉流url地址见https://pengrl.com/lal/#/streamurllist（除了srt/whep）
@@ -80,6 +84,10 @@ http(s)://127.0.0.1:1290/whep?streamid=test110
 ## Http-fmp4
 拉流url
 http(s)://127.0.0.1:1290/live/m4s/test110.mp4
+
+## HLS(fmp4/Low Latency)
+拉流url
+http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 
 
 

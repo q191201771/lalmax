@@ -12,6 +12,7 @@ type Config struct {
 	RtcConfig        RtcConfig      `json:"rtc_config"`      // rtc配置
 	HttpConfig       HttpConfig     `json:"http_config"`     // http/https配置
 	HttpFmp4Config   HttpFmp4Config `json:"httpfmp4_config"` // http-fmp4配置
+	HlsConfig        HlsConfig      `json:"hls_config"`      // hls-fmp4/llhls配置
 	LalSvrConfigPath string         `json:"lal_config_path"` // lal配置目录
 }
 
@@ -37,6 +38,14 @@ type HttpConfig struct {
 
 type HttpFmp4Config struct {
 	Enable bool `json:"enable"` // http-fmp4使能标志
+}
+
+type HlsConfig struct {
+	Enable          bool `json:"enable"`          // hls使能标志
+	SegmentCount    int  `json:"segmentCount"`    // 分片个数,llhls默认7个
+	SegmentDuration int  `json:"segmentDuration"` // hls分片时长,默认1s
+	PartDuration    int  `json:"partDuration"`    // llhls part时长,默认200ms
+	LowLatency      bool `json:"lowLatency"`      // 是否开启llhls
 }
 
 func Open(filepath string) error {

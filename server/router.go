@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -19,8 +18,11 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 		router.POST("/whep", s.HandleWHEP)
 		router.OPTIONS("/whep", s.HandleWHEP)
 
-		// http-fmp4/hls/dash
-		router.GET("/live/m4s/:streamid", s.HandleHttpM4s)
+		// http-fmp4
+		router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
+
+		// hls-fmp4/llhls
+		router.GET("/live/hls/:streamid/:type", s.HandleHls)
 	}
 }
 func (s *LalMaxServer) Cors() gin.HandlerFunc {
@@ -40,7 +42,7 @@ func (s *LalMaxServer) Cors() gin.HandlerFunc {
 
 		//允许类型校验
 		if method == "OPTIONS" {
-			c.JSON(http.StatusOK, "ok!")
+			//c.JSON(http.StatusOK, "ok!")
 		}
 		c.Next()
 	}
@@ -67,30 +69,22 @@ func (s *LalMaxServer) HandleWHEP(c *gin.Context) {
 	}
 }
 
-func (s *LalMaxServer) HandleHttpM4s(c *gin.Context) {
-	if strings.HasSuffix(c.Request.URL.Path, ".m3u8") {
-		s.handleM3u8(c)
-	} else if strings.HasSuffix(c.Request.URL.Path, ".mpd") {
-		s.handleDash(c)
-	} else if strings.HasSuffix(c.Request.URL.Path, ".mp4") {
-		s.handleHttpFmp4(c)
+func (s *LalMaxServer) HandleHls(c *gin.Context) {
+	if s.hlssvr != nil {
+		s.hlssvr.HandleRequest(c)
 	} else {
-		c.Status(http.StatusBadRequest)
-		return
+		nazalog.Error("hls is disable")
+		c.Status(http.StatusNotFound)
 	}
 }
 
-func (s *LalMaxServer) handleHttpFmp4(c *gin.Context) {
-	nazalog.Info("handleHttpFmp4")
+func (s *LalMaxServer) HandleHttpFmp4(c *gin.Context) {
 	if s.httpfmp4svr != nil {
 		s.httpfmp4svr.HandleRequest(c)
+	} else {
+		nazalog.Error("http-fmp4 is disable")
+		c.Status(http.StatusNotFound)
 	}
-}
-
-func (s *LalMaxServer) handleM3u8(c *gin.Context) {
-	// TODO 支持hls-fmp4/llhls
-	nazalog.Info("handle m3u8")
-	c.Status(http.StatusOK)
 }
 
 func (s *LalMaxServer) handleDash(c *gin.Context) {

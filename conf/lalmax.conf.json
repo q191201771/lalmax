@@ -18,6 +18,9 @@
     "httpfmp4_config": {
       "enable": true
     },
+    "hls_config":{
+      "enable": true
+    },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 
