@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"lalmax/fmp4/hls"
 	"sync"
 
 	"github.com/q191201771/lal/pkg/base"
@@ -18,6 +19,7 @@ type HookSession struct {
 	consumers   sync.Map
 	videoheader *base.RtmpMsg
 	audioheader *base.RtmpMsg
+	hlssvr      *hls.HlsServer
 }
 
 type consumerInfo struct {
@@ -25,10 +27,15 @@ type consumerInfo struct {
 	hasSendVideo bool
 }
 
-func NewHookSession(uniqueKey, streamName string) *HookSession {
+func NewHookSession(uniqueKey, streamName string, hlssvr *hls.HlsServer) *HookSession {
 	s := &HookSession{
 		uniqueKey:  uniqueKey,
 		streamName: streamName,
+		hlssvr:     hlssvr,
+	}
+
+	if s.hlssvr != nil {
+		s.hlssvr.NewHlsSession(streamName)
 	}
 
 	nazalog.Infof("create hook session, uniqueKey:%s, streamName:%s", uniqueKey, streamName)
@@ -38,6 +45,9 @@ func NewHookSession(uniqueKey, streamName string) *HookSession {
 }
 
 func (session *HookSession) OnMsg(msg base.RtmpMsg) {
+	if session.hlssvr != nil {
+		session.hlssvr.OnMsg(session.streamName, msg)
+	}
 
 	if msg.IsVideoKeySeqHeader() {
 		session.cacheVideoHeaderMsg(&msg)
@@ -84,6 +94,10 @@ func (session *HookSession) cacheAudioHeaderMsg(msg *base.RtmpMsg) {
 }
 
 func (session *HookSession) OnStop() {
+	if session.hlssvr != nil {
+		session.hlssvr.OnStop(session.streamName)
+	}
+
 	nazalog.Debugf("OnStop, uniqueKey:%s, streamName:%s", session.uniqueKey, session.streamName)
 	session.consumers.Range(func(key, value interface{}) bool {
 		c := value.(*consumerInfo)
