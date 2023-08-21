@@ -1,8 +1,6 @@
 package hls
 
 import (
-	"net/http"
-	"strings"
 	"sync"
 	"time"
 
@@ -48,21 +46,12 @@ func (s *HlsServer) OnStop(streamName string) {
 	if ok {
 		session := value.(*HlsSession)
 		s.invalidSessions.Store(session.SessionId, session)
-		s.sessions.Delete(session)
+		s.sessions.Delete(streamName)
 	}
 }
 
 func (s *HlsServer) HandleRequest(ctx *gin.Context) {
-	path := ctx.Request.URL.Path
-	path = strings.TrimLeft(path, "/live/hls/")
-
-	params := strings.Split(path, "/")
-	if len(params) == 1 {
-		ctx.Status(http.StatusFound)
-		return
-	}
-
-	streamName := params[0]
+	streamName := ctx.Param("streamid")
 	value, ok := s.sessions.Load(streamName)
 	if ok {
 		session := value.(*HlsSession)
