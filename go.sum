@@ -10,6 +10,8 @@ github.com/asticode/go-astits v1.13.0 h1:XOgkaadfZODnyZRR5Y0/DWkA9vrkLLPLeeOvDwf
 github.com/asticode/go-astits v1.13.0/go.mod h1:QSHmknZ51pf6KJdHKZHJTLlMegIrhega3LPWz3ND/iI=
 github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c h1:8XZeJrs4+ZYhJeJ2aZxADI2tGADS15AzIF8MQ8XAhT4=
 github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c/go.mod h1:x1vxHcL/9AVzuk5HOloOEPrtJY0MaalYr78afXZ+pWI=
+github.com/bluenviron/gohlslib v1.0.0 h1:UOI7wW7EdXPnnoflPL+WRiUB+bDSyrR9AXtu029n5EY=
+github.com/bluenviron/gohlslib v1.0.0/go.mod h1:fwqXogd2G/CJ/0kD6TTALmWI3KAm66nZoI+06O02YKI=
 github.com/bluenviron/gortsplib/v3 v3.10.0 h1:E2ytPD1/b6JgzHYVSsyaG2xtXsvaGw9sxTdZ0Wnwsd4=
 github.com/bluenviron/gortsplib/v3 v3.10.0/go.mod h1:prNU1aMVBmgmmKwlvLiEdjBbTEpTw4BRsqVcqEARgMY=
 github.com/bluenviron/mediacommon v1.0.0 h1:hKelTQKfetasCmXaXMiL1ihID0GRmItyWZt1/pqiKKk=
