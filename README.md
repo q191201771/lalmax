@@ -5,7 +5,15 @@ lalmax是以lal为内核的卍解
 ./build.sh
 
 # 运行
-./run.sh
+./run.sh或者./lalmax -c conf/lalmax.conf.json
+
+# 配置说明
+lalmax.conf.json配置主要由2部分组成
+
+(1) lal_config_path表示lal配置文件的路径,用于加载lal本身的配置,具体配置说明见[lal配置](https://pengrl.com/lal/#/ConfigBrief)
+
+(2) 剩余的配置则为lalmax的配置,具体配置说明见[config.md](./document/config.md)
+
 
 # docker运行
 ```
@@ -29,7 +37,9 @@ docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 
 
 (4) RTC(WHIP)
 
-具体的推流url地址见https://pengrl.com/lal/#/streamurllist（除了srt/whip）
+具体的推流url地址（除了srt/whip）
+
+https://pengrl.com/lal/#/streamurllist
 
 ## 拉流
 (1) RTSP
@@ -82,10 +92,14 @@ WHEP拉流url
 http(s)://127.0.0.1:1290/whep?streamid=test110
 
 ## Http-fmp4
+(1) 支持H264/H265/AAC/G711A/G711U
+
 拉流url
 http(s)://127.0.0.1:1290/live/m4s/test110.mp4
 
 ## HLS(fmp4/Low Latency)
+(1) 支持H264/H265/AAC
+
 拉流url
 http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 
