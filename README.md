@@ -37,6 +37,8 @@ docker run -it -p 1935:1935 -p 8080:8080 -p 4433:4433 -p 5544:5544 -p 8083:8083 
 
 (4) RTC(WHIP)
 
+(5) GB28181
+
 具体的推流url地址（除了srt/whip）
 
 https://pengrl.com/lal/#/streamurllist
@@ -102,6 +104,15 @@ http(s)://127.0.0.1:1290/live/m4s/test110.mp4
 
 拉流url
 http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
+
+## [GB28181](./document/gb28181.md)
+(1) 作为SIP服务器与设备进行SIP交互,打开lalserver的端口接收码流
+
+(2) 流ID为设备通道编码ID
+
+(3) 支持H264/H265/AAC
+
+(4) 支持TCP/UDP
 
 
 

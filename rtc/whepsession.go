@@ -3,11 +3,11 @@ package rtc
 import (
 	"lalmax/hook"
 
+	"github.com/gofrs/uuid"
 	"github.com/pion/webrtc/v3"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
-	uuid "github.com/satori/go.uuid"
 )
 
 type whepSession struct {
@@ -30,11 +30,12 @@ func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 		return nil
 	}
 
+	u, _ := uuid.NewV4()
 	return &whepSession{
 		hooks:        session,
 		pc:           pc,
 		lalServer:    lalServer,
-		subscriberId: uuid.NewV4().String(),
+		subscriberId: u.String(),
 		msgChan:      make(chan base.RtmpMsg, 100),
 		closeChan:    make(chan bool),
 	}

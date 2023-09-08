@@ -3,12 +3,14 @@ package httpfmp4
 import (
 	"errors"
 	"fmt"
-	"github.com/q191201771/naza/pkg/connection"
 	"io"
 	"lalmax/hook"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/gofrs/uuid"
+	"github.com/q191201771/naza/pkg/connection"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/aac"
@@ -17,7 +19,6 @@ import (
 	"github.com/q191201771/lal/pkg/h2645"
 	"github.com/q191201771/lal/pkg/hevc"
 	"github.com/q191201771/naza/pkg/nazalog"
-	uuid "github.com/satori/go.uuid"
 	"github.com/yapingcat/gomedia/go-codec"
 	"github.com/yapingcat/gomedia/go-mp4"
 )
@@ -106,9 +107,11 @@ type HttpFmp4Session struct {
 func NewHttpFmp4Session(streamid string) *HttpFmp4Session {
 
 	streamid = strings.TrimSuffix(streamid, ".mp4")
+	u, _ := uuid.NewV4()
+
 	session := &HttpFmp4Session{
 		streamid:     streamid,
-		subscriberId: uuid.NewV4().String(),
+		subscriberId: u.String(),
 		fws:          newFmp4WriterSeeker(bufCapacity),
 	}
 
