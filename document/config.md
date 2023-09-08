@@ -110,5 +110,61 @@
 
 *值举例*: true
 
+# gb28181_config
+
+- enable: gb28181使能配置
+
+*类型*: bool
+
+*值举例*: true
+
+- listenAddr: gb28181监听地址
+
+*类型*: string
+
+*值举例*: "0.0.0.0"
+
+- sipNetwork: 传输协议
+  
+*类型*: string
+
+*值举例*: "udp"
+
+- sipIp: sip服务器公网IP
+  
+*类型*: string
+
+*值举例*: "100.100.100.101"
+
+- sipPort: sip服务器公网端口
+  
+*类型*: uint16
+
+*值举例*: 5060
+
+- serial: sip服务器ID
+  
+*类型*: string
+
+*值举例*: "34020000002000000001"
+
+- realm: sip服务器域
+  
+*类型*: string
+
+*值举例*: "3402000000"
+
+- username: sip服务器账号
+  
+*类型*: string
+
+*值举例*: "admin"
+
+- password: sip服务器密码
+  
+*类型*: string
+
+*值举例*: "admin123"
+
 # lal_config_path
 主要设置lal配置文件的路径

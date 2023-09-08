@@ -41,6 +41,8 @@ func NewHlsSession(streamName string, conf config.HlsConfig) *HlsSession {
 		variant = gohlslib.MuxerVariantLowLatency
 	}
 
+	u, _ := uuid.NewV4()
+
 	session := &HlsSession{
 		muxer: &gohlslib.Muxer{
 			Variant: variant,
@@ -50,8 +52,11 @@ func NewHlsSession(streamName string, conf config.HlsConfig) *HlsSession {
 		maxMsgSize:   10,
 		data:         make([]Frame, 10)[0:0],
 		streamName:   streamName,
-		SessionId:    uuid.NewV4().String(),
+		SessionId:    u.String(),
 	}
+
+	uid, _ := uuid.NewV4()
+	session.SessionId = uid.String()
 
 	if !conf.LowLatency && conf.SegmentCount > 0 {
 		// fmp4模式下可以设置分片个数

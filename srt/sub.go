@@ -5,9 +5,9 @@ import (
 	"lalmax/hook"
 
 	srt "github.com/datarhei/gosrt"
+	"github.com/gofrs/uuid"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazalog"
-	uuid "github.com/satori/go.uuid"
 	codec "github.com/yapingcat/gomedia/go-codec"
 	flv "github.com/yapingcat/gomedia/go-flv"
 	ts "github.com/yapingcat/gomedia/go-mpeg2"
@@ -30,13 +30,13 @@ type Subscriber struct {
 }
 
 func NewSubscriber(ctx context.Context, conn srt.Conn, streamName string, maxSendPacketSize int) *Subscriber {
-
+	u, _ := uuid.NewV4()
 	sub := &Subscriber{
 		ctx:               ctx,
 		conn:              conn,
 		streamName:        streamName,
 		muxer:             ts.NewTSMuxer(),
-		subscriberId:      uuid.NewV4().String(),
+		subscriberId:      u.String(),
 		maxSendPacketSize: maxSendPacketSize,
 	}
 

@@ -21,6 +21,13 @@
     "hls_config":{
       "enable": true
     },
+    "gb28181_config":{
+      "enable": true,
+      "serial": "99920000002000000000",
+      "realm": "99999999",
+      "sipIp": "100.100.100.100",
+      "sipNetwork": "tcp"
+    },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 

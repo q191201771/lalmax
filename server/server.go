@@ -6,6 +6,7 @@ import (
 	config "lalmax/conf"
 	"lalmax/fmp4/hls"
 	httpfmp4 "lalmax/fmp4/http-fmp4"
+	"lalmax/gb28181"
 	"lalmax/hook"
 	"lalmax/rtc"
 	"lalmax/srt"
@@ -25,6 +26,7 @@ type LalMaxServer struct {
 	routerTls   *gin.Engine
 	httpfmp4svr *httpfmp4.HttpFmp4Server
 	hlssvr      *hls.HlsServer
+	gbsbr       *gb28181.GB28181Server
 }
 
 func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
@@ -61,6 +63,10 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 		maxsvr.hlssvr = hls.NewHlsServer(conf.HlsConfig)
 	}
 
+	if conf.GB28181Config.Enable {
+		maxsvr.gbsbr = gb28181.NewGB28181Server(conf.GB28181Config)
+	}
+
 	maxsvr.router = gin.Default()
 	maxsvr.InitRouter(maxsvr.router)
 	if conf.HttpConfig.EnableHttps {
@@ -89,6 +95,10 @@ func (s *LalMaxServer) Run() (err error) {
 	if s.conf.HttpConfig.EnableHttps {
 		server := &http.Server{Addr: s.conf.HttpConfig.HttpsListenAddr, Handler: s.routerTls, TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){}}
 		go server.ListenAndServeTLS(s.conf.HttpConfig.HttpsCertFile, s.conf.HttpConfig.HttpsKeyFile)
+	}
+
+	if s.rtcsvr != nil {
+		go s.gbsbr.Start()
 	}
 
 	return s.lalsvr.RunLoop()
