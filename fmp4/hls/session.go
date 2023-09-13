@@ -103,10 +103,12 @@ func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 				nazalog.Error(err)
 			}
 		} else {
-			pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
-			err := session.muxer.WriteMPEG4Audio(time.Now(), pts, [][]byte{msg.Payload[2:]})
-			if err != nil {
-				nazalog.Error(err)
+			if session.audioCodecId == int(base.RtmpSoundFormatAac) {
+				pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
+				err := session.muxer.WriteMPEG4Audio(time.Now(), pts, [][]byte{msg.Payload[2:]})
+				if err != nil {
+					nazalog.Error(err)
+				}
 			}
 		}
 
@@ -116,23 +118,27 @@ func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 	switch msg.Header.MsgTypeId {
 	case base.RtmpTypeIdAudio:
 		session.audioCodecId = int(msg.AudioCodecId())
-		if msg.IsAacSeqHeader() {
-			session.asc = msg.Payload[2:]
+		if session.audioCodecId == int(base.RtmpSoundFormatAac) {
+			if msg.IsAacSeqHeader() {
+				session.asc = msg.Payload[2:]
+			} else {
+				if !session.audioStartPTSFilled {
+					session.startAudioPts = time.Millisecond * time.Duration(msg.Dts())
+					session.audioStartPTSFilled = true
+				}
+
+				pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
+
+				frame := Frame{
+					ntp:       time.Now(),
+					pts:       pts,
+					au:        [][]byte{msg.Payload[2:]},
+					codecType: msg.AudioCodecId(),
+				}
+				session.data = append(session.data, frame)
+			}
 		} else {
-			if !session.audioStartPTSFilled {
-				session.startAudioPts = time.Millisecond * time.Duration(msg.Dts())
-				session.audioStartPTSFilled = true
-			}
-
-			pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
-
-			frame := Frame{
-				ntp:       time.Now(),
-				pts:       pts,
-				au:        [][]byte{msg.Payload[2:]},
-				codecType: msg.AudioCodecId(),
-			}
-			session.data = append(session.data, frame)
+			return
 		}
 	case base.RtmpTypeIdVideo:
 		if msg.IsVideoKeySeqHeader() {
