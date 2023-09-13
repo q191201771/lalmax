@@ -417,7 +417,9 @@ func (session *HttpFmp4Session) VideoMsg2AvPacket(msg base.RtmpMsg) {
 		} else {
 			pkt.PayloadType = base.AvPacketPtHevc
 		}
-		session.interleavedWrite(pkt)
+		if err := session.interleavedWrite(pkt); err != nil {
+			session.dispose()
+		}
 	}
 }
 
@@ -453,7 +455,9 @@ func (session *HttpFmp4Session) AudioMsg2AvPacket(msg base.RtmpMsg) {
 			Cts:         msg.Cts(),
 			Payload:     out,
 		}
-		session.interleavedWrite(pkt)
+		if err := session.interleavedWrite(pkt); err != nil {
+			session.dispose()
+		}
 
 	}
 }

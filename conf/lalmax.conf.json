@@ -5,6 +5,7 @@
     },
     "rtc_config": {
       "enable": true,
+      "iceHostNatToIps": [],
       "iceUdpMuxPort": 4888,
       "iceTcpMuxPort": 4888
     },
@@ -23,12 +24,14 @@
     },
     "gb28181_config":{
       "enable": true,
-      "serial": "99920000002000000000",
-      "realm": "99999999",
+      "serial": "34020000002000000001",
+      "realm": "3402000000",
       "sipIp": "100.100.100.100",
-      "sipNetwork": "tcp"
+      "sipPort": 5060,
+      "sipNetwork": "tcp",
+      "username": ""
+
     },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 
-  

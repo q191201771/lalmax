@@ -1,8 +1,6 @@
 package httpfmp4
 
 import (
-	"strings"
-
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,8 +14,7 @@ func NewHttpFmp4Server() *HttpFmp4Server {
 }
 
 func (s *HttpFmp4Server) HandleRequest(c *gin.Context) {
-	path := c.Request.URL.Path
-	streamid := strings.TrimLeft(path, "/live/m4s/")
+	streamid := c.Param("streamid")
 
 	session := NewHttpFmp4Session(streamid)
 	session.handleSession(c)

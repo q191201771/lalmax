@@ -189,7 +189,6 @@ func (conn *whepSession) sendAudio(msg base.RtmpMsg) {
 
 		for _, pkt := range pkts {
 			if err := conn.audioTrack.WriteRTP(pkt); err != nil {
-				nazalog.Error(err)
 				continue
 			}
 		}
@@ -207,7 +206,6 @@ func (conn *whepSession) sendVideo(msg base.RtmpMsg) {
 
 		for _, pkt := range pkts {
 			if err := conn.videoTrack.WriteRTP(pkt); err != nil {
-				nazalog.Error(err)
 				continue
 			}
 		}
