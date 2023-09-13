@@ -25,6 +25,7 @@ func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) (*RtcServer, er
 
 	if config.ICEUDPMuxPort != 0 {
 		var udplistener *net.UDPConn
+
 		udplistener, err := net.ListenUDP("udp", &net.UDPAddr{
 			IP:   net.IP{0, 0, 0, 0},
 			Port: config.ICEUDPMuxPort,
@@ -34,12 +35,13 @@ func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) (*RtcServer, er
 			nazalog.Error(err)
 			return nil, err
 		}
-
+		nazalog.Infof("webrtc ice udp listen. port=%d", config.ICEUDPMuxPort)
 		udpMux = webrtc.NewICEUDPMux(nil, udplistener)
 	}
 
 	if config.ICETCPMuxPort != 0 {
 		var tcplistener *net.TCPListener
+
 		tcplistener, err := net.ListenTCP("tcp", &net.TCPAddr{
 			IP:   net.IP{0, 0, 0, 0},
 			Port: config.ICETCPMuxPort,
@@ -49,7 +51,7 @@ func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) (*RtcServer, er
 			nazalog.Error(err)
 			return nil, err
 		}
-
+		nazalog.Infof("webrtc ice tcp listen. port=%d", config.ICETCPMuxPort)
 		tcpMux = webrtc.NewICETCPMux(nil, tcplistener, 20)
 	}
 

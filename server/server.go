@@ -90,11 +90,21 @@ func (s *LalMaxServer) Run() (err error) {
 		go s.srtsvr.Run(ctx)
 	}
 
-	go s.router.Run(s.conf.HttpConfig.ListenAddr)
+	go func() {
+		nazalog.Infof("lalmax http listen. addr=%s", s.conf.HttpConfig.ListenAddr)
+		if err = s.router.Run(s.conf.HttpConfig.ListenAddr); err != nil {
+			nazalog.Infof("lalmax http stop. addr=%s", s.conf.HttpConfig.ListenAddr)
+		}
+	}()
 
 	if s.conf.HttpConfig.EnableHttps {
 		server := &http.Server{Addr: s.conf.HttpConfig.HttpsListenAddr, Handler: s.routerTls, TLSNextProto: map[string]func(*http.Server, *tls.Conn, http.Handler){}}
-		go server.ListenAndServeTLS(s.conf.HttpConfig.HttpsCertFile, s.conf.HttpConfig.HttpsKeyFile)
+		go func() {
+			nazalog.Infof("lalmax https listen. addr=%s", s.conf.HttpConfig.HttpsListenAddr)
+			if err = server.ListenAndServeTLS(s.conf.HttpConfig.HttpsCertFile, s.conf.HttpConfig.HttpsKeyFile); err != nil {
+				nazalog.Infof("lalmax https stop. addr=%s", s.conf.HttpConfig.ListenAddr)
+			}
+		}()
 	}
 
 	if s.rtcsvr != nil {

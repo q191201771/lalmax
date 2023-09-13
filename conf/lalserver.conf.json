@@ -31,7 +31,7 @@
     },
     "hls": {
       "enable": false,
-      "enable_https": true,
+      "enable_https": false,
       "url_pattern": "/hls/",
       "out_path": "./lal_record/hls/",
       "fragment_duration_ms": 3000,
@@ -43,8 +43,8 @@
       "sub_session_hash_key": ""
     },
     "httpts": {
-      "enable": true,
-      "enable_https": true,
+      "enable": false,
+      "enable_https": false,
       "url_pattern": "/",
       "gop_num": 0,
       "single_gop_max_frame_num": 0
@@ -128,4 +128,3 @@
       "log_group_max_sub_num_per_group": 10
     }
   }
-  

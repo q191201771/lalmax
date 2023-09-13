@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"lalmax/server"
 	"os"
+	"path/filepath"
 
 	"github.com/q191201771/naza/pkg/nazalog"
 
@@ -51,6 +52,31 @@ func parseFlag() string {
 	if *p != "" {
 		os.Chdir(*p)
 	}
+	if *cf != "" {
+		return *cf
+	}
+	nazalog.Warnf("config file did not specify in the command line, try to load it in the usual path.")
+	defaultConfigFileList := []string{
+		filepath.FromSlash("lalmax.conf.json"),
+		filepath.FromSlash("./conf/lalmax.conf.json"),
+		filepath.FromSlash("../conf/lalmax.conf.json"),
+	}
+	for _, dcf := range defaultConfigFileList {
+		fi, err := os.Stat(dcf)
+		if err == nil && fi.Size() > 0 && !fi.IsDir() {
+			nazalog.Warnf("%s exist. using it as config file.", dcf)
+			return dcf
+		} else {
+			nazalog.Warnf("%s not exist.", dcf)
+		}
+	}
 
+	// 默认位置都没有，退出程序
+	flag.Usage()
+	_, _ = fmt.Fprintf(os.Stderr, `
+						Example:
+						  %s -c %s
+						`, os.Args[0], filepath.FromSlash("./conf/lalmax.conf.json"))
+	base.OsExitAndWaitPressIfWindows(1)
 	return *cf
 }
