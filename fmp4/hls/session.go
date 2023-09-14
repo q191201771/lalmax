@@ -266,7 +266,9 @@ func (session *HlsSession) drain() {
 }
 
 func (session *HlsSession) OnStop() {
-	session.muxer.Close()
+	if session.done {
+		session.muxer.Close()
+	}
 }
 
 func (session *HlsSession) HandleRequest(ctx *gin.Context) {
