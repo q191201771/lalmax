@@ -1,5 +1,5 @@
 # lalmax
-lalmax是以lal为内核的卍解
+lalmax是在lal的基础上集成第三方库，可以提供SRT、RTC、mp4、gb28181、onvif等解决方案
 
 # 编译
 ./build.sh
