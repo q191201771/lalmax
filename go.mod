@@ -15,9 +15,10 @@ require (
 	github.com/pion/interceptor v0.1.17
 	github.com/pion/rtp v1.8.1
 	github.com/pion/webrtc/v3 v3.2.8
-	github.com/q191201771/lal v0.35.41
-	github.com/q191201771/naza v0.30.12
+	github.com/q191201771/lal v0.36.7
+	github.com/q191201771/naza v0.30.48
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
+	github.com/use-go/onvif v0.0.9
 	github.com/yapingcat/gomedia v0.0.0-20230727105416-c491e66c9d2a
 	golang.org/x/net v0.14.0
 	golang.org/x/text v0.12.0
@@ -28,11 +29,13 @@ require (
 	github.com/aler9/writerseeker v1.1.0 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/asticode/go-astits v1.13.0 // indirect
+	github.com/beevik/etree v1.1.0 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/discoviking/fsm v0.0.0-20150126104936-f4a273feecca // indirect
+	github.com/elgs/gostrgen v0.0.0-20161222160715-9d61ae07eeae // indirect
 	github.com/gabriel-vasile/mimetype v1.4.2 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
@@ -44,6 +47,7 @@ require (
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/juju/errors v0.0.0-20220331221717-b38fca44723b // indirect
 	github.com/klauspost/cpuid/v2 v2.2.4 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/leodido/go-urn v1.2.4 // indirect
@@ -66,6 +70,7 @@ require (
 	github.com/pion/transport/v2 v2.2.1 // indirect
 	github.com/pion/turn/v2 v2.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/rs/zerolog v1.26.1 // indirect
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
 	github.com/tevino/abool v0.0.0-20170917061928-9b9efcf221b5 // indirect

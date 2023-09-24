@@ -28,6 +28,9 @@
       "sipIp": "100.100.100.100",
       "sipNetwork": "tcp"
     },
+    "onvif_config": {
+      "enable": true
+    },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 

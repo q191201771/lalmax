@@ -166,5 +166,12 @@
 
 *值举例*: "admin123"
 
+# onvif_config
+- enable: onvif使能配置
+
+*类型*: bool
+
+*值举例*: true
+
 # lal_config_path
 主要设置lal配置文件的路径
