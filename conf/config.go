@@ -14,6 +14,7 @@ type Config struct {
 	HttpFmp4Config   HttpFmp4Config `json:"httpfmp4_config"` // http-fmp4配置
 	HlsConfig        HlsConfig      `json:"hls_config"`      // hls-fmp4/llhls配置
 	GB28181Config    GB28181Config  `json:"gb28181_config"`  // gb28181配置
+	OnvifConfig      OnvifConfig    `json:"onvif_config"`    //
 	LalSvrConfigPath string         `json:"lal_config_path"` // lal配置目录
 }
 
@@ -59,6 +60,10 @@ type GB28181Config struct {
 	Realm      string `json:"realm"`      // sip 服务器域，默认 3402000000
 	Username   string `json:"username"`   // sip 服务器账号
 	Password   string `json:"password"`   // sip 服务器密码
+}
+
+type OnvifConfig struct {
+	Enable bool `json:"enable"`
 }
 
 func Open(filepath string) error {

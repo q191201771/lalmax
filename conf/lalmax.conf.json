@@ -32,6 +32,9 @@
       "username": ""
 
     },
+    "onvif_config": {
+      "enable": true
+    },
     "lal_config_path:":"./conf/lalserver.conf.json"
 }
 

@@ -23,6 +23,9 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 
 		// hls-fmp4/llhls
 		router.GET("/live/hls/:streamid/:type", s.HandleHls)
+
+		// onvif
+		router.POST("/api/ctrl/onvif/pull", s.HandleOnvifPull)
 	}
 }
 func (s *LalMaxServer) Cors() gin.HandlerFunc {
@@ -83,8 +86,8 @@ func (s *LalMaxServer) HandleHttpFmp4(c *gin.Context) {
 	}
 }
 
-func (s *LalMaxServer) handleDash(c *gin.Context) {
-	// TODO 支持dash
-	nazalog.Info("handle dash")
-	c.Status(http.StatusOK)
+func (s *LalMaxServer) HandleOnvifPull(c *gin.Context) {
+	if s.onvifsvr != nil {
+		s.onvifsvr.HandlePull(c)
+	}
 }

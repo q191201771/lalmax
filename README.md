@@ -114,5 +114,22 @@ http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 
 (4) 支持TCP/UDP
 
+## Onvif
+(1) onvif接入设备进行pull拉流
+
+(2) 支持tcp/udp拉流
+
+(3) pull api:http://127.0.0.1:1290/api/ctrl/onvif/pull
+```
+{
+    "addr": <string>,           // 设备IP:PORT
+    "username": <string>,       // 用户名
+    "password": <string>,       // 密码
+    "rtspmode": <int>,          // rtsp拉流模式,0-tcp, 1-udp
+    "pullallprofiles": <bool>   // 是否请求所有的profiles
+}
+```
+
+
 
 

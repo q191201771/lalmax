@@ -8,6 +8,7 @@ import (
 	httpfmp4 "lalmax/fmp4/http-fmp4"
 	"lalmax/gb28181"
 	"lalmax/hook"
+	"lalmax/onvif"
 	"lalmax/rtc"
 	"lalmax/srt"
 	"net/http"
@@ -27,6 +28,7 @@ type LalMaxServer struct {
 	httpfmp4svr *httpfmp4.HttpFmp4Server
 	hlssvr      *hls.HlsServer
 	gbsbr       *gb28181.GB28181Server
+	onvifsvr    *onvif.OnvifServer
 }
 
 func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
@@ -65,6 +67,10 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 
 	if conf.GB28181Config.Enable {
 		maxsvr.gbsbr = gb28181.NewGB28181Server(conf.GB28181Config)
+	}
+
+	if conf.OnvifConfig.Enable {
+		maxsvr.onvifsvr = onvif.NewOnvifServer()
 	}
 
 	maxsvr.router = gin.Default()
