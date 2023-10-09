@@ -33,7 +33,6 @@ func NewUnPacker(mimeType string, clockRate uint32, pktChan chan<- base.AvPacket
 		pktChan:   pktChan,
 	}
 
-	// TODO 支持opus
 	switch mimeType {
 	case webrtc.MimeTypeH264:
 		un.payloadType = base.AvPacketPtAvc
@@ -44,6 +43,9 @@ func NewUnPacker(mimeType string, clockRate uint32, pktChan chan<- base.AvPacket
 	case webrtc.MimeTypePCMU:
 		un.payloadType = base.AvPacketPtG711U
 		un.dec = NewG711RtpDecoder()
+	case webrtc.MimeTypeOpus:
+		un.payloadType = base.AvPacketPtAac
+		un.dec = NewOpusRtpDecoder()
 	default:
 		nazalog.Errorf("invalid mimeType:%s", mimeType)
 		return nil
@@ -147,6 +149,34 @@ func NewG711RtpDecoder() *G711RtpDecoder {
 }
 
 func (r *G711RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, time.Duration, error) {
+	frame, pts, err := r.dec.Decode(pkt)
+	if err != nil {
+		nazalog.Error(err)
+		return nil, 0, err
+	}
+
+	return frame, pts, nil
+}
+
+type OpusRtpDecoder struct {
+	IRtpDecoder
+	dec *rtpsimpleaudio.Decoder
+}
+
+func NewOpusRtpDecoder() *OpusRtpDecoder {
+	var forma formats.Opus
+	dec, err := forma.CreateDecoder2()
+	if err != nil {
+		nazalog.Error(err)
+		return nil
+	}
+
+	return &OpusRtpDecoder{
+		dec: dec,
+	}
+}
+
+func (r *OpusRtpDecoder) Decode(pkt *rtp.Packet) ([]byte, time.Duration, error) {
 	frame, pts, err := r.dec.Decode(pkt)
 	if err != nil {
 		nazalog.Error(err)

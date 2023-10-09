@@ -84,6 +84,14 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 			}
 
 			mimeType = webrtc.MimeTypePCMU
+		case base.RtmpSoundFormatAac:
+			conn.audioTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "lalmax")
+			if err != nil {
+				nazalog.Error(err)
+				return
+			}
+
+			mimeType = webrtc.MimeTypeOpus
 		default:
 			nazalog.Error("unsupport audio codeid:", audioId)
 		}
@@ -95,7 +103,7 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 				return
 			}
 
-			conn.audiopacker = NewPacker(mimeType, nil)
+			conn.audiopacker = NewPacker(mimeType, audioHeader.Payload[2:])
 		}
 	}
 
@@ -189,6 +197,7 @@ func (conn *whepSession) sendAudio(msg base.RtmpMsg) {
 
 		for _, pkt := range pkts {
 			if err := conn.audioTrack.WriteRTP(pkt); err != nil {
+				nazalog.Error(err)
 				continue
 			}
 		}

@@ -50,7 +50,21 @@ func newPeerConnection(ips []string, iceUDPMux ice.UDPMux, iceTCPMux ice.TCPMux)
 		return
 	}
 
-	// TODO opus音频
+	// opus音频
+	err = mediaEngine.RegisterCodec(
+		webrtc.RTPCodecParameters{
+			RTPCodecCapability: webrtc.RTPCodecCapability{
+				MimeType:  webrtc.MimeTypeOpus,
+				ClockRate: 48000,
+				Channels:  2,
+			},
+			PayloadType: 111,
+		}, webrtc.RTPCodecTypeAudio)
+
+	if err != nil {
+		nazalog.Error(err)
+		return
+	}
 
 	// PCMU
 	err = mediaEngine.RegisterCodec(

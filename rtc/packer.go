@@ -2,13 +2,14 @@ package rtc
 
 import (
 	"fmt"
-
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
+	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/avc"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/rtprtcp"
 	"github.com/q191201771/naza/pkg/nazalog"
+	"github.com/yapingcat/gomedia/go-codec"
 )
 
 type Packer struct {
@@ -25,6 +26,8 @@ func NewPacker(mimeType string, codec []byte) *Packer {
 		p.enc = NewG711RtpEncoder(8)
 	case webrtc.MimeTypePCMU:
 		p.enc = NewG711RtpEncoder(0)
+	case webrtc.MimeTypeOpus:
+		p.enc = NewOpusRtpEncoder(codec)
 	}
 	return p
 }
@@ -133,6 +136,66 @@ func (enc *G711RtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
 	avpacket := base.AvPacket{
 		Timestamp: int64(msg.Dts()),
 		Payload:   msg.Payload[1:],
+	}
+
+	var pkts []*rtp.Packet
+	rtpPkts := enc.rtpPacker.Pack(avpacket)
+	for _, pkt := range rtpPkts {
+		var newRtpPkt rtp.Packet
+		err := newRtpPkt.Unmarshal(pkt.Raw)
+		if err != nil {
+			nazalog.Error(err)
+			continue
+		}
+
+		pkts = append(pkts, &newRtpPkt)
+	}
+
+	if len(rtpPkts) == 0 {
+		return nil, fmt.Errorf("Packetize failed")
+	}
+
+	return pkts, nil
+}
+
+type OpusRtpEncoder struct {
+	IRtpEncoder
+	rtpPacker *rtprtcp.RtpPacker
+	asc       []byte
+}
+
+func NewOpusRtpEncoder(asc []byte) *OpusRtpEncoder {
+	pp := rtprtcp.NewRtpPackerPayloadAac()
+
+	ascCtx, err := aac.NewAscContext(asc)
+	if err != nil {
+		nazalog.Error(err)
+	}
+
+	channelCount := ascCtx.ChannelConfiguration
+	clockRate, _ := ascCtx.GetSamplingFrequency()
+
+	return &OpusRtpEncoder{
+		asc:       asc,
+		rtpPacker: rtprtcp.NewRtpPacker(pp, clockRate, uint32(channelCount)),
+	}
+}
+
+func (enc *OpusRtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
+	var out []byte
+	data := msg.Payload[2:]
+
+	if !msg.IsAacSeqHeader() {
+		adts, err := codec.ConvertASCToADTS(enc.asc, len(data)+7)
+		if err != nil {
+			return nil, fmt.Errorf("convert asc to adts failed to convert")
+		}
+		out = append(adts.Encode(), data...)
+	}
+
+	avpacket := base.AvPacket{
+		Timestamp: int64(msg.Dts()),
+		Payload:   out,
 	}
 
 	var pkts []*rtp.Packet
