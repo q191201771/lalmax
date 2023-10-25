@@ -3,8 +3,8 @@ package srt
 import (
 	"bufio"
 	"context"
-
 	srt "github.com/datarhei/gosrt"
+	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -40,23 +40,46 @@ func (p *Publisher) SetSession(session logic.ICustomizePubSessionContext) {
 }
 
 func (p *Publisher) Run() {
-	defer p.conn.Close()
-
+	defer func() {
+		p.conn.Close()
+		p.srv.Remove(p.streamName, p.ss)
+	}()
+	audioSampleRate := uint32(0)
 	var foundAudio bool
 	p.demuxer.OnFrame = func(cid ts.TS_STREAM_TYPE, frame []byte, pts uint64, dts uint64) {
 		var pkt base.AvPacket
 		if cid == ts.TS_STREAM_AAC {
 			if !foundAudio {
-				asc, _ := codec.ConvertADTSToASC(frame)
-				p.ss.FeedAudioSpecificConfig(asc.Encode())
+				if asc, err := codec.ConvertADTSToASC(frame); err != nil {
+					return
+				} else {
+					p.ss.FeedAudioSpecificConfig(asc.Encode())
+					audioSampleRate = uint32(codec.AACSampleIdxToSample(int(asc.Sample_freq_index)))
+				}
+
 				foundAudio = true
 			}
 
-			pkt.Payload = frame[7:]
-			pkt.PayloadType = base.AvPacketPtAac
-			pkt.Pts = int64(pts)
-			pkt.Timestamp = int64(dts)
-			p.ss.FeedAvPacket(pkt)
+			var preAudioDts uint64
+			ctx := aac.AdtsHeaderContext{}
+			for len(frame) > aac.AdtsHeaderLength {
+				ctx.Unpack(frame[:])
+				if preAudioDts == 0 {
+					preAudioDts = dts
+				} else {
+					preAudioDts += uint64(1024 * 1000 / audioSampleRate)
+				}
+
+				aacPacket := base.AvPacket{
+					Timestamp:   int64(preAudioDts),
+					PayloadType: base.AvPacketPtAac,
+					Pts:         int64(preAudioDts),
+				}
+				Payload := frame[aac.AdtsHeaderLength:ctx.AdtsLength]
+				frame = frame[ctx.AdtsLength:]
+				aacPacket.Payload = Payload
+				p.ss.FeedAvPacket(aacPacket)
+			}
 		} else if cid == ts.TS_STREAM_H264 {
 			pkt.Payload = frame
 			pkt.PayloadType = base.AvPacketPtAvc
@@ -77,13 +100,14 @@ func (p *Publisher) Run() {
 		case <-p.ctx.Done():
 			return
 		default:
+
 		}
 
 		err := p.demuxer.Input(bufio.NewReader(p.conn))
 		if err != nil {
 			nazalog.Infof("stream [%s] disconnected", p.streamName)
-			p.srv.Remove(p.streamName, p.ss)
 			break
 		}
+		return
 	}
 }
