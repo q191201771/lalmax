@@ -75,10 +75,17 @@ func (p *Publisher) Run() {
 					PayloadType: base.AvPacketPtAac,
 					Pts:         int64(preAudioDts),
 				}
-				Payload := frame[aac.AdtsHeaderLength:ctx.AdtsLength]
-				frame = frame[ctx.AdtsLength:]
-				aacPacket.Payload = Payload
-				p.ss.FeedAvPacket(aacPacket)
+				if len(frame) >= int(ctx.AdtsLength) {
+					Payload := frame[aac.AdtsHeaderLength:ctx.AdtsLength]
+					if len(frame) > int(ctx.AdtsLength) {
+						frame = frame[ctx.AdtsLength:]
+					} else {
+						frame = frame[0:0]
+					}
+					aacPacket.Payload = Payload
+					p.ss.FeedAvPacket(aacPacket)
+				}
+
 			}
 		} else if cid == ts.TS_STREAM_H264 {
 			pkt.Payload = frame
@@ -94,20 +101,9 @@ func (p *Publisher) Run() {
 			p.ss.FeedAvPacket(pkt)
 		}
 	}
-
-	for {
-		select {
-		case <-p.ctx.Done():
-			return
-		default:
-
-		}
-
-		err := p.demuxer.Input(bufio.NewReader(p.conn))
-		if err != nil {
-			nazalog.Infof("stream [%s] disconnected", p.streamName)
-			break
-		}
-		return
+	err := p.demuxer.Input(bufio.NewReader(p.conn))
+	if err != nil {
+		nazalog.Infof("stream [%s] disconnected", p.streamName)
 	}
+	return
 }
