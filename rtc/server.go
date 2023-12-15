@@ -4,6 +4,7 @@ import (
 	config "lalmax/conf"
 	"net"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pion/ice/v2"
@@ -138,6 +139,11 @@ func (s *RtcServer) HandleWHEP(c *gin.Context) {
 	if whepsession == nil {
 		c.Status(http.StatusInternalServerError)
 		return
+	}
+
+	userAgent := c.Request.UserAgent()
+	if strings.Contains(userAgent, "Safari") {
+		whepsession.SetRemoteSafari(true)
 	}
 
 	sdp := whepsession.GetAnswerSDP(string(body))

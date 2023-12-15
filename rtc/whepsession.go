@@ -21,6 +21,7 @@ type whepSession struct {
 	audiopacker  *Packer
 	msgChan      chan base.RtmpMsg
 	closeChan    chan bool
+	remoteSafari bool
 }
 
 func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalServer) *whepSession {
@@ -41,6 +42,10 @@ func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 	}
 }
 
+func (conn *whepSession) SetRemoteSafari(val bool) {
+	conn.remoteSafari = val
+}
+
 func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 	var err error
 
@@ -59,7 +64,24 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 				return
 			}
 
-			conn.videopacker = NewPacker(webrtc.MimeTypeH264, videoHeader.Payload)
+			conn.videopacker = NewPacker(PacketH264, videoHeader.Payload)
+		} else if videoHeader.IsHevcKeySeqHeader() {
+			if conn.remoteSafari {
+				// hevc暂时只支持对接Safari hevc
+				conn.videoTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH265}, "video", "lalmax")
+				if err != nil {
+					nazalog.Error(err)
+					return
+				}
+
+				_, err = conn.pc.AddTrack(conn.videoTrack)
+				if err != nil {
+					nazalog.Error(err)
+					return
+				}
+
+				conn.videopacker = NewPacker(PacketSafariHevc, videoHeader.Payload)
+			}
 		}
 	}
 
@@ -75,7 +97,7 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 				return
 			}
 
-			mimeType = webrtc.MimeTypePCMA
+			mimeType = PacketPCMA
 		case base.RtmpSoundFormatG711U:
 			conn.audioTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMU}, "audio", "lalmax")
 			if err != nil {
@@ -83,7 +105,7 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 				return
 			}
 
-			mimeType = webrtc.MimeTypePCMU
+			mimeType = PacketPCMU
 		default:
 			nazalog.Error("unsupport audio codeid:", audioId)
 		}
