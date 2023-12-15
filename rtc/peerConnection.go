@@ -50,6 +50,16 @@ func newPeerConnection(ips []string, iceUDPMux ice.UDPMux, iceTCPMux ice.TCPMux)
 		return
 	}
 
+	err = mediaEngine.RegisterCodec(
+		webrtc.RTPCodecParameters{
+			RTPCodecCapability: webrtc.RTPCodecCapability{
+				MimeType:  webrtc.MimeTypeH265,
+				ClockRate: 90000,
+			},
+			PayloadType: 102,
+		},
+		webrtc.RTPCodecTypeVideo)
+
 	// TODO opus音频
 
 	// PCMU
