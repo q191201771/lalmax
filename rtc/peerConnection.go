@@ -60,6 +60,11 @@ func newPeerConnection(ips []string, iceUDPMux ice.UDPMux, iceTCPMux ice.TCPMux)
 		},
 		webrtc.RTPCodecTypeVideo)
 
+	if err != nil {
+		nazalog.Error(err)
+		return
+	}
+
 	// TODO opus音频
 
 	// PCMU
