@@ -1,6 +1,7 @@
 package rtc
 
 import (
+	"fmt"
 	config "lalmax/conf"
 	"net"
 	"net/http"
@@ -98,6 +99,8 @@ func (s *RtcServer) HandleWHIP(c *gin.Context) {
 		return
 	}
 
+	c.Header("Location", fmt.Sprintf("whip/%s", whipsession.subscriberId))
+
 	sdp := whipsession.GetAnswerSDP(string(body))
 	if sdp == "" {
 		c.Status(http.StatusInternalServerError)
@@ -140,6 +143,8 @@ func (s *RtcServer) HandleWHEP(c *gin.Context) {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
+
+	c.Header("Location", fmt.Sprintf("whep/%s", whepsession.subscriberId))
 
 	userAgent := c.Request.UserAgent()
 	if strings.Contains(userAgent, "Safari") {

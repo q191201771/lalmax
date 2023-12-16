@@ -1,5 +1,7 @@
 github.com/abema/go-mp4 v0.12.0 h1:XI9PPt1BpjB3wFl18oFiX6C99uesx7F/X13Z+ga8bYY=
 github.com/abema/go-mp4 v0.12.0/go.mod h1:vPl9t5ZK7K0x68jh12/+ECWBCXoWuIDtNgPtU2f04ws=
+github.com/abema/go-mp4 v1.1.1 h1:OfzkdMO6SWTBR1ltNSVwlTHatrAK9I3iYLQfkdEMMuc=
+github.com/abema/go-mp4 v1.1.1/go.mod h1:vPl9t5ZK7K0x68jh12/+ECWBCXoWuIDtNgPtU2f04ws=
 github.com/aler9/gortsplib/v2 v2.2.2 h1:tTw8pdKSOEjlZjjE1S4ftXPHJkYOqjNNv3hjQ0Nto9M=
 github.com/aler9/gortsplib/v2 v2.2.2/go.mod h1:k6uBVHGwsIc/0L5SLLqWwi6bSJUb4VR0HfvncyHlKQI=
 github.com/aler9/writerseeker v1.1.0 h1:t+Sm3tjp8scNlqyoa8obpeqwciMNOvdvsxjxEb3Sx3g=
@@ -14,10 +16,14 @@ github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c h1:8XZeJrs4+ZYh
 github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c/go.mod h1:x1vxHcL/9AVzuk5HOloOEPrtJY0MaalYr78afXZ+pWI=
 github.com/bluenviron/gohlslib v1.0.0 h1:UOI7wW7EdXPnnoflPL+WRiUB+bDSyrR9AXtu029n5EY=
 github.com/bluenviron/gohlslib v1.0.0/go.mod h1:fwqXogd2G/CJ/0kD6TTALmWI3KAm66nZoI+06O02YKI=
+github.com/bluenviron/gohlslib v1.0.6 h1:OTgbPo83h8wul4VueYPi4N/Y/g2zrAq0LLuO5UEp6SE=
+github.com/bluenviron/gohlslib v1.0.6/go.mod h1:BoHoT4od0Dw1KjOWd3MttODIqE/06b7VIaYVHw8xJvo=
 github.com/bluenviron/gortsplib/v3 v3.10.0 h1:E2ytPD1/b6JgzHYVSsyaG2xtXsvaGw9sxTdZ0Wnwsd4=
 github.com/bluenviron/gortsplib/v3 v3.10.0/go.mod h1:prNU1aMVBmgmmKwlvLiEdjBbTEpTw4BRsqVcqEARgMY=
 github.com/bluenviron/mediacommon v1.0.0 h1:hKelTQKfetasCmXaXMiL1ihID0GRmItyWZt1/pqiKKk=
 github.com/bluenviron/mediacommon v1.0.0/go.mod h1:nt5oKCO0WcZ+AH1oc12gs2ldp67xW2vl88c2StNmPlI=
+github.com/bluenviron/mediacommon v1.5.1 h1:yYVF+ebqZOJh8yH+EeuPcAtTmWR66BqbJGmStxkScoI=
+github.com/bluenviron/mediacommon v1.5.1/go.mod h1:Ij/kE1LEucSjryNBVTyPL/gBI0d6/Css3f5PyrM957w=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
 github.com/bytedance/sonic v1.9.1 h1:6iJ6NqdoxCDr6mbY8h18oSO+cShGSMRGCEo7F2h0x8s=
 github.com/bytedance/sonic v1.9.1/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=

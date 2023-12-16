@@ -4,9 +4,9 @@ go 1.18
 
 require (
 	github.com/aler9/gortsplib/v2 v2.2.2
-	github.com/bluenviron/gohlslib v1.0.0
+	github.com/bluenviron/gohlslib v1.0.6
 	github.com/bluenviron/gortsplib/v3 v3.10.0
-	github.com/bluenviron/mediacommon v1.0.0
+	github.com/bluenviron/mediacommon v1.5.1
 	github.com/datarhei/gosrt v0.5.4
 	github.com/ghettovoice/gosip v0.0.0-20230802091127-d58873a3fe44
 	github.com/gin-gonic/gin v1.9.1
@@ -25,7 +25,7 @@ require (
 )
 
 require (
-	github.com/abema/go-mp4 v0.12.0 // indirect
+	github.com/abema/go-mp4 v1.1.1 // indirect
 	github.com/aler9/writerseeker v1.1.0 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/asticode/go-astits v1.13.0 // indirect
