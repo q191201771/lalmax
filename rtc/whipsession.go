@@ -1,6 +1,7 @@
 package rtc
 
 import (
+	"github.com/gofrs/uuid"
 	"github.com/pion/webrtc/v3"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
@@ -16,6 +17,7 @@ type whipSession struct {
 	audioUnpacker *UnPacker
 	pktChan       chan base.AvPacket
 	closeChan     chan bool
+	subscriberId  string
 }
 
 func NewWhipSession(streamid string, pc *peerConnection, lalServer logic.ILalServer) *whipSession {
@@ -29,13 +31,16 @@ func NewWhipSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 		option.VideoFormat = base.AvPacketStreamVideoFormatAnnexb
 	})
 
+	u, _ := uuid.NewV4()
+
 	return &whipSession{
-		streamid:   streamid,
-		pc:         pc,
-		lalServer:  lalServer,
-		lalSession: session,
-		pktChan:    make(chan base.AvPacket, 100),
-		closeChan:  make(chan bool),
+		streamid:     streamid,
+		pc:           pc,
+		lalServer:    lalServer,
+		lalSession:   session,
+		pktChan:      make(chan base.AvPacket, 100),
+		closeChan:    make(chan bool),
+		subscriberId: u.String(),
 	}
 }
 

@@ -13,10 +13,12 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 		// whip
 		router.POST("/whip", s.HandleWHIP)
 		router.OPTIONS("/whip", s.HandleWHIP)
+		router.DELETE("/whip", s.HandleWHIP)
 
 		// whep
 		router.POST("/whep", s.HandleWHEP)
 		router.OPTIONS("/whep", s.HandleWHEP)
+		router.DELETE("/whep", s.HandleWHEP)
 
 		// http-fmp4
 		router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
@@ -56,6 +58,9 @@ func (s *LalMaxServer) HandleWHIP(c *gin.Context) {
 		if s.rtcsvr != nil {
 			s.rtcsvr.HandleWHIP(c)
 		}
+	case "DELETE":
+		// TODO 实现DELETE
+		c.Status(http.StatusOK)
 	}
 }
 
@@ -65,6 +70,9 @@ func (s *LalMaxServer) HandleWHEP(c *gin.Context) {
 		if s.rtcsvr != nil {
 			s.rtcsvr.HandleWHEP(c)
 		}
+	case "DELETE":
+		// TODO 实现DELETE
+		c.Status(http.StatusOK)
 	}
 }
 
