@@ -212,15 +212,15 @@ func (enc *SafariHEVCRtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error)
 
 		if hevc.IsIrapNalu(t) {
 			keyFrame = true
-			out = append(out, avc.NaluStartCode3...)
+			out = append(out, avc.NaluStartCode4...)
 			out = append(out, enc.vps...)
-			out = append(out, avc.NaluStartCode3...)
+			out = append(out, avc.NaluStartCode4...)
 			out = append(out, enc.sps...)
-			out = append(out, avc.NaluStartCode3...)
+			out = append(out, avc.NaluStartCode4...)
 			out = append(out, enc.pps...)
 		}
 
-		out = append(out, avc.NaluStartCode3...)
+		out = append(out, avc.NaluStartCode4...)
 		out = append(out, nal...)
 	})
 
