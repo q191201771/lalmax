@@ -29,8 +29,8 @@
       "sipIp": "100.100.100.100",
       "sipPort": 5060,
       "sipNetwork": "tcp",
-      "username": ""
-
+      "username": "",
+      "streamIp": "100.100.100.100"
     },
     "onvif_config": {
       "enable": true

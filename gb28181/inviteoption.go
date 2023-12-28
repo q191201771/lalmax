@@ -2,7 +2,6 @@ package gb28181
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 )
 
@@ -22,13 +21,9 @@ func (o InviteOptions) String() string {
 	return fmt.Sprintf("t=%d %d", o.Start, o.End)
 }
 
-func (o *InviteOptions) CreateSSRC(serial string) {
-	ssrc := make([]byte, 10)
-	ssrc[0] = '0'
-	copy(ssrc[1:6], serial[3:8])
-	randNum := 1000 + rand.Intn(8999)
-	copy(ssrc[6:], strconv.Itoa(randNum))
-	o.ssrc = string(ssrc)
+func (o *InviteOptions) CreateSSRC(serial string, number uint16) {
+	//不按gb生成标准,取ID最后六位，然后按顺序生成，一个channel最大999
+	o.ssrc = fmt.Sprintf("%d%s%03d", 0, serial[14:], number)
 	_ssrc, _ := strconv.ParseInt(o.ssrc, 10, 0)
 	o.SSRC = uint32(_ssrc)
 }

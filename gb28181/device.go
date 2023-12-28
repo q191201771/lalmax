@@ -54,14 +54,16 @@ type Device struct {
 	GpsTime      time.Time //gps时间
 	Longitude    string    //经度
 	Latitude     string    //纬度
+	ApiPort      uint16
+	ApiSsl       bool //流媒体 Api 是否ssl
 }
 
 func (d *Device) syncChannels(conf config.GB28181Config) {
 	if time.Since(d.lastSyncTime) > 2*time.Second {
 		d.lastSyncTime = time.Now()
 		d.Catalog(conf)
-		d.Subscribe(conf)
-		d.QueryDeviceInfo(conf)
+		//d.Subscribe(conf)
+		//d.QueryDeviceInfo(conf)
 	}
 }
 

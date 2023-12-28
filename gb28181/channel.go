@@ -18,30 +18,32 @@ import (
 )
 
 type Channel struct {
-	device    *Device      // 所属设备
-	status    atomic.Int32 // 通道状态,0:空闲,1:正在invite,2:正在播放
-	GpsTime   time.Time    // gps时间
-	Longitude string       // 经度
-	Latitude  string       // 纬度
+	device  *Device      // 所属设备
+	status  atomic.Int32 // 通道状态,0:空闲,1:正在invite,2:正在播放
+	GpsTime time.Time    // gps时间
+	number  uint16
+	ackReq  sip.Request
 	ChannelInfo
 }
 
 // Channel 通道
 type ChannelInfo struct {
-	DeviceID     string // 通道ID
-	ParentID     string
-	Name         string
-	Manufacturer string
-	Model        string
-	Owner        string
-	CivilCode    string
-	Address      string
-	Port         int
-	Parental     int
-	SafetyWay    int
-	RegisterWay  int
-	Secrecy      int
-	Status       ChannelStatus
+	DeviceID     string        // 设备id
+	ParentID     string        //父目录Id
+	Name         string        //设备名称
+	Manufacturer string        //制造厂商
+	Model        string        //型号
+	Owner        string        //设备归属
+	CivilCode    string        //行政区划编码
+	Address      string        //地址
+	Port         int           //端口
+	Parental     int           //存在子设备，这里表明有子目录存在 1代表有子目录，0表示没有
+	SafetyWay    int           //信令安全模式（可选）缺省为 0；0：不采用；2：S/MIME 签名方式；3：S/MIME	加密签名同时采用方式；4：数字摘要方式
+	RegisterWay  int           //标准的认证注册模式
+	Secrecy      int           //0 表示不涉密
+	Status       ChannelStatus // 状态  on 在线 off离线
+	Longitude    string        // 经度
+	Latitude     string        // 纬度
 }
 
 type ChannelStatus string
@@ -62,20 +64,13 @@ func (channel *Channel) CanInvite() bool {
 		nazalog.Info("return false, channel.status.Load():", channel.status.Load(), " channel.DeviceID:", len(channel.DeviceID), " channel.Status:", channel.Status)
 		return false
 	}
-
+	if channel.Parental != 0 {
+		return false
+	}
 	// 11～13位是设备类型编码
 	typeID := channel.DeviceID[10:13]
-	tokens := strings.Split("132", ",")
-	for _, tok := range tokens {
-		if first, second, ok := strings.Cut(tok, "-"); ok {
-			if typeID >= first && typeID <= second {
-				return true
-			}
-		} else {
-			if typeID == first {
-				return true
-			}
-		}
+	if typeID == "132" || typeID == "131" {
+		return true
 	}
 
 	nazalog.Info("return false")
@@ -148,7 +143,13 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config) (c
 	}
 	d := channel.device
 	s := "Play"
-	opt.CreateSSRC(conf.Serial)
+
+	//依据deviceId生成ssrc,取设备ID最后六位，然后按顺序生成，一个channel最大999 方便排查问题,也能保证唯一性
+	channel.number++
+	if channel.number > 999 {
+		channel.number = 1
+	}
+	opt.CreateSSRC(channel.DeviceID, channel.number)
 
 	protocol := ""
 	networkType := conf.SipNetwork
@@ -156,7 +157,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config) (c
 	nazalog.Info("networkType:", networkType)
 
 	// 获取lal的端口
-	opt.MediaPort, _ = d.DoLal(channel.DeviceID, networkType)
+	opt.MediaPort, _ = d.DoLalStartRtpPub(channel.DeviceID, networkType)
 	if networkType == "tcp" {
 		protocol = "TCP/"
 	}
@@ -221,12 +222,26 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config) (c
 				}
 			}
 		}
-
-		err = sipsvr.Send(sip.NewAckRequest("", invite, inviteRes, "", nil))
+		ackReq := sip.NewAckRequest("", invite, inviteRes, "", nil)
+		channel.ackReq = ackReq
+		err = sipsvr.Send(ackReq)
 	}
 	return
 }
-
+func (channel *Channel) Bye() (err error) {
+	//流媒体端由无人观看机制关闭
+	if channel.ackReq != nil {
+		byeReq := channel.ackReq
+		byeReq.SetMethod(sip.BYE)
+		seq, _ := byeReq.CSeq()
+		seq.SeqNo += 1
+		err = sipsvr.Send(byeReq)
+		if err == nil {
+			channel.ackReq = nil
+		}
+	}
+	return err
+}
 func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB28181Config) (req sip.Request) {
 	d := channel.device
 	d.sn++
@@ -285,7 +300,7 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 	return req
 }
 
-func (d *Device) DoLal(deviceId, networkType string) (uint16, error) {
+func (d *Device) DoLalStartRtpPub(deviceId, networkType string) (uint16, error) {
 	request := &base.ApiCtrlStartRtpPubReq{
 		StreamName: deviceId,
 	}
@@ -295,10 +310,30 @@ func (d *Device) DoLal(deviceId, networkType string) (uint16, error) {
 	}
 
 	data, _ := json.Marshal(request)
-
-	req, err := http.NewRequest("POST", "http://127.0.0.1:8083/api/ctrl/start_rtp_pub", bytes.NewReader(data))
+	url := ""
+	if d.ApiSsl {
+		url = fmt.Sprintf("https://%s:%d/api/ctrl/start_rtp_pub", d.mediaIP, d.ApiPort)
+	} else {
+		url = fmt.Sprintf("http://%s:%d/api/ctrl/start_rtp_pub", d.mediaIP, d.ApiPort)
+	}
+	body, err := d.DoLalHttpReq(url, data)
 	if err != nil {
 		return 0, err
+	}
+	response := &base.ApiCtrlStartRtpPubResp{}
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return 0, err
+	}
+
+	nazalog.Info("start_rtp_pub response:", response)
+
+	return uint16(response.Data.Port), nil
+}
+func (d *Device) DoLalHttpReq(url string, reqBody []byte) (respBody []byte, err error) {
+	req, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -310,27 +345,17 @@ func (d *Device) DoLal(deviceId, networkType string) (uint16, error) {
 
 	resp, err := cli.Do(req)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	if resp.StatusCode != 200 {
-		return 0, fmt.Errorf("Response is not 200: %v", resp.Status)
+		return nil, fmt.Errorf("Response is not 200: %v", resp.Status)
 	}
 
 	defer resp.Body.Close()
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-
-	response := &base.ApiCtrlStartRtpPubResp{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return 0, err
-	}
-
-	nazalog.Info("start_rtp_pub response:", response)
-
-	return uint16(response.Data.Port), nil
+	return body, err
 }
