@@ -138,7 +138,61 @@ func (s *GB28181Server) statusCheck() {
 		return true
 	})
 }
-
+func (s *GB28181Server) getDeviceInfos() (deviceInfos *DeviceInfos) {
+	deviceInfos = &DeviceInfos{}
+	Devices.Range(func(key, value any) bool {
+		d := value.(*Device)
+		d.Status = DeviceOfflineStatus
+		d.channelMap.Range(func(key, value any) bool {
+			ch := value.(*Channel)
+			deviceItem := &DeviceItem{
+				ParentID: d.ID,
+				DeviceInfo: DeviceInfo{
+					DeviceID:     ch.DeviceID,
+					Name:         ch.Name,
+					Manufacturer: ch.Manufacturer,
+					Owner:        ch.Owner,
+					CivilCode:    ch.CivilCode,
+					Address:      ch.Address,
+					Status:       ch.Status,
+					Longitude:    ch.Longitude,
+					Latitude:     ch.Latitude,
+					StreamName:   ch.StreamName,
+				},
+			}
+			deviceInfos.DeviceItems = append(deviceInfos.DeviceItems, deviceItem)
+			return true
+		})
+		return true
+	})
+	return deviceInfos
+}
+func (s *GB28181Server) GetAllSyncChannels() {
+	Devices.Range(func(key, value any) bool {
+		d := value.(*Device)
+		d.syncChannels(s.conf)
+		return true
+	})
+}
+func (s *GB28181Server) GetSyncChannels(parentID string) {
+	if v, ok := Devices.Load(parentID); ok {
+		d := v.(*Device)
+		d.syncChannels(s.conf)
+	}
+}
+func (s *GB28181Server) FindChannel(parentID string, deviceID string) (channel *Channel) {
+	if v, ok := Devices.Load(parentID); ok {
+		d := v.(*Device)
+		if ch, ok := d.channelMap.Load(deviceID); ok {
+			channel = ch.(*Channel)
+			return channel
+		} else {
+			return nil
+		}
+	} else {
+		return nil
+	}
+}
 func (s *GB28181Server) OnRegister(req sip.Request, tx sip.ServerTransaction) {
 	from, ok := req.From()
 	if !ok || from.Address == nil {
@@ -239,10 +293,10 @@ func (s *GB28181Server) OnRegister(req sip.Request, tx sip.ServerTransaction) {
 		})
 		_ = tx.Respond(resp)
 
-		if !isUnregister {
-			//订阅设备更新
-			go d.syncChannels(s.conf)
-		}
+		//if !isUnregister {
+		//	//订阅设备更新
+		//	go d.syncChannels(s.conf)
+		//}
 	} else {
 		nazalog.Info("OnRegister unauthorized, id:", id, " source:", req.Source(), " destination:", req.Destination())
 		response := sip.NewResponseFromRequest("", req, http.StatusUnauthorized, "Unauthorized", "")
@@ -270,7 +324,7 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 		switch d.Status {
 		case DeviceOfflineStatus, DeviceRecoverStatus:
 			s.RecoverDevice(d, req)
-			go d.syncChannels(s.conf)
+			//go d.syncChannels(s.conf)
 		case DeviceRegisterStatus:
 			d.Status = DeviceOnlineStatus
 		}
@@ -301,9 +355,9 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 		case "Keepalive":
 			d.LastKeepaliveAt = time.Now()
 			//callID !="" 说明是订阅的事件类型信息
-			if d.lastSyncTime.IsZero() {
-				go d.syncChannels(s.conf)
-			}
+			//if d.lastSyncTime.IsZero() {
+			//	go d.syncChannels(s.conf)
+			//}
 		case "Catalog":
 			d.UpdateChannels(s.conf, temp.DeviceList...)
 		case "DeviceInfo":

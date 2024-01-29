@@ -87,8 +87,8 @@ func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) 
 			}
 		}
 		//本设备增加通道
-		channel := d.addOrUpdateChannel(c)
-		channel.TryAutoInvite(&InviteOptions{}, conf)
+		d.addOrUpdateChannel(c)
+		//channel.TryAutoInvite(&InviteOptions{}, conf)
 	}
 }
 

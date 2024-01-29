@@ -44,6 +44,7 @@ type ChannelInfo struct {
 	Status       ChannelStatus // 状态  on 在线 off离线
 	Longitude    string        // 经度
 	Latitude     string        // 纬度
+	StreamName   string
 }
 
 type ChannelStatus string
@@ -53,8 +54,8 @@ const (
 	ChannelOffStatus = "OFF"
 )
 
-func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config) {
-	if channel.CanInvite(channel.DeviceID) {
+func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName string) {
+	if channel.CanInvite(streamName) {
 		go channel.Invite(opt, conf)
 	}
 }

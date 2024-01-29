@@ -1,6 +1,7 @@
 package server
 
 import (
+	"lalmax/gb28181"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -28,6 +29,14 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 
 		// onvif
 		router.POST("/api/ctrl/onvif/pull", s.HandleOnvifPull)
+
+		//gb
+		gbLogic := gb28181.NewGbLogic(s.gbsbr)
+		router.GET("/api/gb/device_infos", gbLogic.GetDeviceInfos)
+		router.POST("/api/gb/start_play", gbLogic.StartPlay)
+		router.POST("/api/gb/stop_play", gbLogic.StopPlay)
+		router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
+		router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
 	}
 }
 func (s *LalMaxServer) Cors() gin.HandlerFunc {
