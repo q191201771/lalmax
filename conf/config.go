@@ -51,15 +51,20 @@ type HlsConfig struct {
 }
 
 type GB28181Config struct {
-	Enable     bool   `json:"enable"`     // gb28181使能标志
-	ListenAddr string `json:"listenAddr"` // gb28181监听地址
-	SipNetwork string `json:"sipNetwork"` // 传输协议，默认UDP，可选TCP
-	SipIP      string `json:"sipIp"`      // sip 服务器公网IP
-	SipPort    uint16 `json:"sipPort"`    // sip 服务器端口，默认 5060
-	Serial     string `json:"serial"`     // sip 服务器 id, 默认 34020000002000000001
-	Realm      string `json:"realm"`      // sip 服务器域，默认 3402000000
-	Username   string `json:"username"`   // sip 服务器账号
-	Password   string `json:"password"`   // sip 服务器密码
+	Enable            bool   `json:"enable"`            // gb28181使能标志
+	ListenAddr        string `json:"listenAddr"`        // gb28181监听地址
+	SipNetwork        string `json:"sipNetwork"`        // 传输协议，默认UDP，可选TCP
+	SipIP             string `json:"sipIp"`             // sip 服务器公网IP
+	SipPort           uint16 `json:"sipPort"`           // sip 服务器端口，默认 5060
+	Serial            string `json:"serial"`            // sip 服务器 id, 默认 34020000002000000001
+	Realm             string `json:"realm"`             // sip 服务器域，默认 3402000000
+	Username          string `json:"username"`          // sip 服务器账号
+	Password          string `json:"password"`          // sip 服务器密码
+	StreamIP          string `json:"streamIp"`          // 流媒体IP
+	ApiPort           uint16 `json:"apiPort"`           // 流媒体 Api 端口
+	ApiSsl            bool   `json:"apiSsl"`            //流媒体 Api 是否ssl
+	KeepaliveInterval int    `json:"keepaliveInterval"` //心跳包时长
+	QuickLogin        bool   `json:"quickLogin"`        //快速登陆,有keepalive就认为在线
 }
 
 type OnvifConfig struct {
