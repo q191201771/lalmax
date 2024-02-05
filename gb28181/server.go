@@ -319,6 +319,27 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 	from, _ := req.From()
 	id := from.Address.User().String()
 	nazalog.Info("SIP<-OnMessage, id:", id, " source:", req.Source(), " req:", req.String())
+	temp := &struct {
+		XMLName      xml.Name
+		CmdType      string
+		SN           int // 请求序列号，一般用于对应 request 和 response
+		DeviceID     string
+		DeviceName   string
+		Manufacturer string
+		Model        string
+		Channel      string
+		DeviceList   []ChannelInfo `xml:"DeviceList>Item"`
+		SumNum       int           // 录像结果的总数 SumNum，录像结果会按照多条消息返回，可用于判断是否全部返回
+	}{}
+	decoder := xml.NewDecoder(bytes.NewReader([]byte(req.Body())))
+	decoder.CharsetReader = charset.NewReaderLabel
+	err := decoder.Decode(temp)
+	if err != nil {
+		err = DecodeGbk(temp, []byte(req.Body()))
+		if err != nil {
+			nazalog.Error("decode catelog err:", err)
+		}
+	}
 	if v, ok := Devices.Load(id); ok {
 		d := v.(*Device)
 		switch d.Status {
@@ -329,27 +350,7 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 			d.Status = DeviceOnlineStatus
 		}
 		d.UpdateTime = time.Now()
-		temp := &struct {
-			XMLName      xml.Name
-			CmdType      string
-			SN           int // 请求序列号，一般用于对应 request 和 response
-			DeviceID     string
-			DeviceName   string
-			Manufacturer string
-			Model        string
-			Channel      string
-			DeviceList   []ChannelInfo `xml:"DeviceList>Item"`
-			SumNum       int           // 录像结果的总数 SumNum，录像结果会按照多条消息返回，可用于判断是否全部返回
-		}{}
-		decoder := xml.NewDecoder(bytes.NewReader([]byte(req.Body())))
-		decoder.CharsetReader = charset.NewReaderLabel
-		err := decoder.Decode(temp)
-		if err != nil {
-			err = DecodeGbk(temp, []byte(req.Body()))
-			if err != nil {
-				nazalog.Error("decode catelog err:", err)
-			}
-		}
+
 		var body string
 		switch temp.CmdType {
 		case "Keepalive":
@@ -377,6 +378,16 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 
 		tx.Respond(sip.NewResponseFromRequest("", req, http.StatusOK, "OK", body))
 	} else {
+		if s.conf.QuickLogin {
+			switch temp.CmdType {
+			case "Keepalive":
+				d := s.StoreDevice(id, req)
+				d.LastKeepaliveAt = time.Now()
+				tx.Respond(sip.NewResponseFromRequest("", req, http.StatusOK, "OK", ""))
+				return
+			}
+		}
+
 		nazalog.Warn("Unauthorized message, device not found, id:", id)
 		tx.Respond(sip.NewResponseFromRequest("", req, http.StatusBadRequest, "device not found", ""))
 	}
@@ -463,7 +474,6 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 			ApiPort:      apiPort,
 			ApiSsl:       apiSsl,
 		}
-
 		nazalog.Info("StoreDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
 		Devices.Store(id, d)
 	}

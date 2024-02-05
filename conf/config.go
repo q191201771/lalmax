@@ -64,6 +64,7 @@ type GB28181Config struct {
 	ApiPort           uint16 `json:"apiPort"`           // 流媒体 Api 端口
 	ApiSsl            bool   `json:"apiSsl"`            //流媒体 Api 是否ssl
 	KeepaliveInterval int    `json:"keepaliveInterval"` //心跳包时长
+	QuickLogin        bool   `json:"quickLogin"`        //快速登陆,有keepalive就认为在线
 }
 
 type OnvifConfig struct {

@@ -31,6 +31,7 @@
       "sipNetwork": "tcp",
       "username": "",
       "streamIp": "100.100.100.100"
+	  "quickLogin": true
     },
     "onvif_config": {
       "enable": true

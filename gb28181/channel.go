@@ -56,7 +56,7 @@ const (
 
 func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName string) {
 	if channel.CanInvite(streamName) {
-		go channel.Invite(opt, conf)
+		go channel.Invite(opt, conf, streamName)
 	}
 }
 
@@ -135,7 +135,7 @@ f字段中视、音频参数段之间不需空格分割。
 可使用f字段中的分辨率参数标识同一设备不同分辨率的码流。
 */
 
-func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config) (code int, err error) {
+func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName string) (code int, err error) {
 	d := channel.device
 	s := "Play"
 
@@ -152,7 +152,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config) (c
 	nazalog.Info("networkType:", networkType)
 
 	// 获取lal的端口
-	ctrlStartRtpPubResp, err := d.DoLalStartRtpPub(channel.DeviceID, networkType)
+	ctrlStartRtpPubResp, err := d.DoLalStartRtpPub(streamName, networkType)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
