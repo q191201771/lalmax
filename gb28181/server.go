@@ -139,30 +139,34 @@ func (s *GB28181Server) statusCheck() {
 	})
 }
 func (s *GB28181Server) getDeviceInfos() (deviceInfos *DeviceInfos) {
-	deviceInfos = &DeviceInfos{}
+	deviceInfos = &DeviceInfos{
+		DeviceItems: make([]*DeviceItem, 0),
+	}
 	Devices.Range(func(key, value any) bool {
 		d := value.(*Device)
 		d.Status = DeviceOfflineStatus
+		deviceItem := &DeviceItem{
+			DeviceId: d.ID,
+			Channels: make([]*ChannelItem, 0),
+		}
 		d.channelMap.Range(func(key, value any) bool {
 			ch := value.(*Channel)
-			deviceItem := &DeviceItem{
-				ParentID: d.ID,
-				DeviceInfo: DeviceInfo{
-					DeviceID:     ch.DeviceID,
-					Name:         ch.Name,
-					Manufacturer: ch.Manufacturer,
-					Owner:        ch.Owner,
-					CivilCode:    ch.CivilCode,
-					Address:      ch.Address,
-					Status:       ch.Status,
-					Longitude:    ch.Longitude,
-					Latitude:     ch.Latitude,
-					StreamName:   ch.StreamName,
-				},
+			channel := &ChannelItem{
+				ChannelId:    ch.DeviceID,
+				Name:         ch.Name,
+				Manufacturer: ch.Manufacturer,
+				Owner:        ch.Owner,
+				CivilCode:    ch.CivilCode,
+				Address:      ch.Address,
+				Status:       ch.Status,
+				Longitude:    ch.Longitude,
+				Latitude:     ch.Latitude,
+				StreamName:   ch.StreamName,
 			}
-			deviceInfos.DeviceItems = append(deviceInfos.DeviceItems, deviceItem)
+			deviceItem.Channels = append(deviceItem.Channels, channel)
 			return true
 		})
+		deviceInfos.DeviceItems = append(deviceInfos.DeviceItems, deviceItem)
 		return true
 	})
 	return deviceInfos
