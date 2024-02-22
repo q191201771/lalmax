@@ -30,7 +30,7 @@
       "sipPort": 5060,
       "sipNetwork": "tcp",
       "username": "",
-      "streamIp": "100.100.100.100"
+      "streamIp": "100.100.100.100",
 	  "quickLogin": true
     },
     "onvif_config": {
