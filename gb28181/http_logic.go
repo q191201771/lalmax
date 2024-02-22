@@ -62,8 +62,12 @@ func (g *GbLogic) StopPlay(c *gin.Context) {
 			if len(streamName) == 0 {
 				streamName = reqStop.ChannelId
 			}
-			ch.Bye(streamName)
-			ResponseSuccess(c, nil)
+			if err = ch.Bye(streamName); err != nil {
+				ResponseErrorWithMsg(c, CodeDeviceStopError, err.Error())
+			} else {
+				ResponseSuccess(c, nil)
+			}
+
 		}
 	}
 
