@@ -65,6 +65,7 @@ const (
 	CodeInvalidParam
 	CodeServerBusy
 	CodeDeviceNotRegister
+	CodeDeviceStopError
 )
 
 var codeMsgMap = map[ResCode]string{
@@ -72,6 +73,7 @@ var codeMsgMap = map[ResCode]string{
 	CodeInvalidParam:      "请求参数错误",
 	CodeServerBusy:        "服务繁忙",
 	CodeDeviceNotRegister: "设备暂时未注册",
+	CodeDeviceStopError:   "设备停止播放错误",
 }
 
 func (c ResCode) Msg() string {

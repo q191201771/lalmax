@@ -297,10 +297,10 @@ func (s *GB28181Server) OnRegister(req sip.Request, tx sip.ServerTransaction) {
 		})
 		_ = tx.Respond(resp)
 
-		//if !isUnregister {
-		//	//订阅设备更新
-		//	go d.syncChannels(s.conf)
-		//}
+		if !isUnregister {
+			//订阅设备更新
+			go d.syncChannels(s.conf)
+		}
 	} else {
 		nazalog.Info("OnRegister unauthorized, id:", id, " source:", req.Source(), " destination:", req.Destination())
 		response := sip.NewResponseFromRequest("", req, http.StatusUnauthorized, "Unauthorized", "")
@@ -388,6 +388,7 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 				d := s.StoreDevice(id, req)
 				d.LastKeepaliveAt = time.Now()
 				tx.Respond(sip.NewResponseFromRequest("", req, http.StatusOK, "OK", ""))
+				go d.syncChannels(s.conf)
 				return
 			}
 		}
