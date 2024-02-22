@@ -30,14 +30,14 @@ func (g *GbLogic) StartPlay(c *gin.Context) {
 	if err := c.ShouldBindJSON(&reqPlay); err != nil {
 		ResponseErrorWithMsg(c, CodeInvalidParam, CodeInvalidParam.Msg())
 	} else {
-		ch := g.s.FindChannel(reqPlay.ParentID, reqPlay.DeviceID)
+		ch := g.s.FindChannel(reqPlay.DeviceId, reqPlay.ChannelId)
 		if ch == nil {
 			ResponseErrorWithMsg(c, CodeDeviceNotRegister, CodeDeviceNotRegister.Msg())
 
 		} else {
 			streamName := reqPlay.StreamName
 			if len(streamName) == 0 {
-				streamName = reqPlay.DeviceID
+				streamName = reqPlay.ChannelId
 			}
 			ch.TryAutoInvite(&InviteOptions{}, g.s.conf, streamName)
 			respPlay := &RespPlay{
@@ -53,14 +53,14 @@ func (g *GbLogic) StopPlay(c *gin.Context) {
 	if err := c.ShouldBindJSON(&reqStop); err != nil {
 		ResponseErrorWithMsg(c, CodeInvalidParam, CodeInvalidParam.Msg())
 	} else {
-		ch := g.s.FindChannel(reqStop.ParentID, reqStop.DeviceID)
+		ch := g.s.FindChannel(reqStop.DeviceId, reqStop.ChannelId)
 		if ch == nil {
 			ResponseErrorWithMsg(c, CodeDeviceNotRegister, CodeDeviceNotRegister.Msg())
 
 		} else {
 			streamName := reqStop.StreamName
 			if len(streamName) == 0 {
-				streamName = reqStop.DeviceID
+				streamName = reqStop.ChannelId
 			}
 			ch.Bye(streamName)
 			ResponseSuccess(c, nil)
@@ -77,7 +77,7 @@ func (g *GbLogic) UpdateNotify(c *gin.Context) {
 	if err := c.ShouldBindJSON(&reqUpdateNotify); err != nil {
 		ResponseErrorWithMsg(c, CodeInvalidParam, CodeInvalidParam.Msg())
 	} else {
-		g.s.GetSyncChannels(reqUpdateNotify.ParentID)
+		g.s.GetSyncChannels(reqUpdateNotify.DeviceId)
 		ResponseSuccess(c, nil)
 	}
 

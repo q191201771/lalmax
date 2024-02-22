@@ -6,14 +6,14 @@ import (
 )
 
 type DeviceInfos struct {
-	DeviceItems []*DeviceItem
+	DeviceItems []*DeviceItem `json:"device_items"`
 }
 type DeviceItem struct {
-	ParentID   string     `json:"parent_id"` //父目录Id
-	DeviceInfo DeviceInfo `json:"device_info"`
+	DeviceId string         `json:"device_id"` //父目录Id
+	Channels []*ChannelItem `json:"channels"`
 }
-type DeviceInfo struct {
-	DeviceID     string        `json:"device_id"`    // 设备id
+type ChannelItem struct {
+	ChannelId    string        `json:"channel_id"`   // channel id
 	Name         string        `json:"name"`         //设备名称
 	Manufacturer string        `json:"manufacturer"` //制造厂商
 	Owner        string        `json:"owner"`        //设备归属
@@ -22,11 +22,11 @@ type DeviceInfo struct {
 	Status       ChannelStatus `json:"status"`       // 状态  on 在线 off离线
 	Longitude    string        `json:"longitude"`    // 经度
 	Latitude     string        `json:"latitude"`     // 纬度
-	StreamName   string        `json:"streamName"`
+	StreamName   string        `json:"-"`
 }
 type PlayInfo struct {
-	ParentID   string `json:"parent_id" form:"parent_id" url:"parent_id"` //父目录Id
-	DeviceID   string `json:"device_id" form:"device_id" url:"device_id"` // 设备id
+	DeviceId   string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId  string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
 	StreamName string `json:"stream_name" form:"stream_name" url:"stream_name"`
 }
 type ReqPlay struct {
@@ -39,7 +39,7 @@ type ReqStop struct {
 	PlayInfo
 }
 type ReqUpdateNotify struct {
-	ParentID string `json:"parent_id" form:"parent_id" url:"parent_id"` //父目录Id
+	DeviceId string `json:"device_id" form:"device_id" url:"device_id"` //设备 Id
 }
 
 func ResponseErrorWithMsg(c *gin.Context, code ResCode, msg interface{}) {
