@@ -78,30 +78,44 @@ func NewHlsSession(streamName string, conf config.HlsConfig) *HlsSession {
 func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 	if session.done {
 		if msg.Header.MsgTypeId == base.RtmpTypeIdVideo {
-			nals, err := avc.SplitNaluAvcc(msg.Payload[5:])
-			if err != nil {
-				nazalog.Error(err)
-				return
-			}
-
-			var nalus [][]byte
-			if msg.IsAvcKeyNalu() || msg.IsHevcKeyNalu() {
-				if msg.IsAvcKeyNalu() {
-					nalus = append(nalus, session.sps)
-					nalus = append(nalus, session.pps)
+			if msg.IsVideoKeySeqHeader() {
+				session.videoCodecId = int(msg.VideoCodecId())
+				if msg.IsAvcKeySeqHeader() {
+					var err error
+					session.sps, session.pps, err = avc.ParseSpsPpsFromSeqHeader(msg.Payload)
+					if err != nil {
+						nazalog.Error("ParseSpsPpsFromSeqHeader err:", err)
+					}
 				} else {
-					nalus = append(nalus, session.vps)
-					nalus = append(nalus, session.sps)
-					nalus = append(nalus, session.pps)
+					session.vps, session.sps, session.pps, _ = hevc.ParseVpsSpsPpsFromSeqHeaderWithoutMalloc(msg.Payload)
+				}
+			} else {
+				nals, err := avc.SplitNaluAvcc(msg.Payload[5:])
+				if err != nil {
+					nazalog.Error(err)
+					return
+				}
+
+				var nalus [][]byte
+				if msg.IsAvcKeyNalu() || msg.IsHevcKeyNalu() {
+					if msg.IsAvcKeyNalu() {
+						nalus = append(nalus, session.sps)
+						nalus = append(nalus, session.pps)
+					} else {
+						nalus = append(nalus, session.vps)
+						nalus = append(nalus, session.sps)
+						nalus = append(nalus, session.pps)
+					}
+				}
+
+				nalus = append(nalus, nals...)
+				pts := time.Millisecond*time.Duration(msg.Pts()) - session.startVideoPts
+				err = session.muxer.WriteH26x(time.Now(), pts, nalus)
+				if err != nil {
+					nazalog.Error(err)
 				}
 			}
 
-			nalus = append(nalus, nals...)
-			pts := time.Millisecond*time.Duration(msg.Pts()) - session.startVideoPts
-			err = session.muxer.WriteH26x(time.Now(), pts, nalus)
-			if err != nil {
-				nazalog.Error(err)
-			}
 		} else {
 			if session.audioCodecId == int(base.RtmpSoundFormatAac) {
 				pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
