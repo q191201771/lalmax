@@ -113,7 +113,7 @@ func (s *LalMaxServer) Run() (err error) {
 		}()
 	}
 
-	if s.rtcsvr != nil {
+	if s.gbsbr != nil {
 		go s.gbsbr.Start()
 	}
 
