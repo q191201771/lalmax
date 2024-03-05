@@ -152,7 +152,7 @@ func (s *GB28181Server) getDeviceInfos() (deviceInfos *DeviceInfos) {
 		d.channelMap.Range(func(key, value any) bool {
 			ch := value.(*Channel)
 			channel := &ChannelItem{
-				ChannelId:    ch.DeviceID,
+				ChannelId:    ch.ChannelId,
 				Name:         ch.Name,
 				Manufacturer: ch.Manufacturer,
 				Owner:        ch.Owner,
@@ -178,16 +178,16 @@ func (s *GB28181Server) GetAllSyncChannels() {
 		return true
 	})
 }
-func (s *GB28181Server) GetSyncChannels(parentID string) {
-	if v, ok := Devices.Load(parentID); ok {
+func (s *GB28181Server) GetSyncChannels(deviceId string) {
+	if v, ok := Devices.Load(deviceId); ok {
 		d := v.(*Device)
 		d.syncChannels(s.conf)
 	}
 }
-func (s *GB28181Server) FindChannel(parentID string, deviceID string) (channel *Channel) {
-	if v, ok := Devices.Load(parentID); ok {
+func (s *GB28181Server) FindChannel(deviceId string, channelId string) (channel *Channel) {
+	if v, ok := Devices.Load(deviceId); ok {
 		d := v.(*Device)
-		if ch, ok := d.channelMap.Load(deviceID); ok {
+		if ch, ok := d.channelMap.Load(channelId); ok {
 			channel = ch.(*Channel)
 			return channel
 		} else {
@@ -454,7 +454,7 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 		Uri:         from.Address,
 	}
 	deviceIp := req.Source()
-	if _d, loaded := Devices.Load(id); loaded {
+	if _d, ok := Devices.Load(id); ok {
 		d = _d.(*Device)
 		d.UpdateTime = time.Now()
 		d.NetAddr = deviceIp
@@ -559,20 +559,7 @@ func GbkToUtf8(s []byte) ([]byte, error) {
 }
 
 type notifyMessage struct {
-	DeviceID     string //设备id
-	ParentID     string //父目录Id
-	Name         string //设备名称
-	Manufacturer string //制造厂商
-	Model        string //型号
-	Owner        string //设备归属
-	CivilCode    string //行政区划编码
-	Address      string //地址
-	Port         int    //端口
-	Parental     int    //存在子设备，这里表明有子目录存在 1代表有子目录，0表示没有
-	SafetyWay    int    //信令安全模式（可选）缺省为 0；0：不采用；2：S/MIME 签名方式；3：S/MIME	加密签名同时采用方式；4：数字摘要方式
-	RegisterWay  int    //标准的认证注册模式
-	Secrecy      int    //0 表示不涉密
-	Status       string // 状态  on 在线 off离线
+	ChannelInfo
 
 	//状态改变事件 ON:上线,OFF:离线,VLOST:视频丢失,DEFECT:故障,ADD:增加,DEL:删除,UPDATE:更新(必选)
 	Event string

@@ -28,23 +28,23 @@ type Channel struct {
 
 // Channel 通道
 type ChannelInfo struct {
-	DeviceID     string        // 设备id
-	ParentID     string        //父目录Id
-	Name         string        //设备名称
-	Manufacturer string        //制造厂商
-	Model        string        //型号
-	Owner        string        //设备归属
-	CivilCode    string        //行政区划编码
-	Address      string        //地址
-	Port         int           //端口
-	Parental     int           //存在子设备，这里表明有子目录存在 1代表有子目录，0表示没有
-	SafetyWay    int           //信令安全模式（可选）缺省为 0；0：不采用；2：S/MIME 签名方式；3：S/MIME	加密签名同时采用方式；4：数字摘要方式
-	RegisterWay  int           //标准的认证注册模式
-	Secrecy      int           //0 表示不涉密
-	Status       ChannelStatus // 状态  on 在线 off离线
-	Longitude    string        // 经度
-	Latitude     string        // 纬度
-	StreamName   string
+	ChannelId    string        `xml:"DeviceID"`     // 设备id
+	ParentId     string        `xml:"ParentID"`     //父目录Id
+	Name         string        `xml:"Name"`         //设备名称
+	Manufacturer string        `xml:"Manufacturer"` //制造厂商
+	Model        string        `xml:"Model"`        //型号
+	Owner        string        `xml:"Owner"`        //设备归属
+	CivilCode    string        `xml:"CivilCode"`    //行政区划编码
+	Address      string        `xml:"Address"`      //地址
+	Port         int           `xml:"Port"`         //端口
+	Parental     int           `xml:"Parental"`     //存在子设备，这里表明有子目录存在 1代表有子目录，0表示没有
+	SafetyWay    int           `xml:"SafetyWay"`    //信令安全模式（可选）缺省为 0；0：不采用；2：S/MIME 签名方式；3：S/MIME	加密签名同时采用方式；4：数字摘要方式
+	RegisterWay  int           `xml:"RegisterWay"`  //标准的认证注册模式
+	Secrecy      int           `xml:"Secrecy"`      //0 表示不涉密
+	Status       ChannelStatus `xml:"Status"`       // 状态  on 在线 off离线
+	Longitude    string        `xml:"Longitude"`    // 经度
+	Latitude     string        `xml:"Latitude"`     // 纬度
+	StreamName   string        `xml:"-"`
 }
 
 type ChannelStatus string
@@ -61,8 +61,8 @@ func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Con
 }
 
 func (channel *Channel) CanInvite(streamName string) bool {
-	if len(channel.DeviceID) != 20 || channel.Status == ChannelOffStatus {
-		nazalog.Info("return false,  channel.DeviceID:", len(channel.DeviceID), " channel.Status:", channel.Status)
+	if len(channel.ChannelId) != 20 || channel.Status == ChannelOffStatus {
+		nazalog.Info("return false,  channel.DeviceID:", len(channel.ChannelId), " channel.Status:", channel.Status)
 		return false
 	}
 	if channel.Parental != 0 {
@@ -78,7 +78,7 @@ func (channel *Channel) CanInvite(streamName string) bool {
 	}
 
 	// 11～13位是设备类型编码
-	typeID := channel.DeviceID[10:13]
+	typeID := channel.ChannelId[10:13]
 	if typeID == "132" || typeID == "131" {
 		return true
 	}
@@ -144,7 +144,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	if channel.number > 999 {
 		channel.number = 1
 	}
-	opt.CreateSSRC(channel.DeviceID, channel.number)
+	opt.CreateSSRC(channel.ChannelId, channel.number)
 
 	protocol := ""
 	networkType := conf.SipNetwork
@@ -166,7 +166,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 
 	sdpInfo := []string{
 		"v=0",
-		fmt.Sprintf("o=%s 0 0 IN IP4 %s", channel.DeviceID, d.mediaIP),
+		fmt.Sprintf("o=%s 0 0 IN IP4 %s", channel.ChannelId, d.mediaIP),
 		"s=" + s,
 		"c=IN IP4 " + d.mediaIP,
 		opt.String(),
@@ -190,7 +190,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	invite.SetBody(strings.Join(sdpInfo, "\r\n")+"\r\n", true)
 
 	subject := sip.GenericHeader{
-		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.DeviceID, opt.ssrc, ""),
+		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.ChannelId, opt.ssrc, ""),
 	}
 	invite.AppendHeader(&subject)
 	inviteRes, err := d.SipRequestForResponse(invite)
@@ -270,7 +270,7 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 	}
 	//非同一域的目标地址需要使用@host
 	host := conf.Realm
-	if channel.DeviceID[0:9] != host {
+	if channel.ChannelId[0:9] != host {
 		if channel.Port != 0 {
 			deviceIp := d.NetAddr
 			deviceIp = deviceIp[0:strings.LastIndex(deviceIp, ":")]
@@ -281,7 +281,7 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 	}
 
 	channelAddr := sip.Address{
-		Uri: &sip.SipUri{FUser: sip.String{Str: channel.DeviceID}, FHost: host},
+		Uri: &sip.SipUri{FUser: sip.String{Str: channel.ChannelId}, FHost: host},
 	}
 	req = sip.NewRequest(
 		"",
