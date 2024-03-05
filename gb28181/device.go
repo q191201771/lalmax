@@ -80,9 +80,6 @@ func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) 
 					parent := v.(*Device)
 					parent.addOrUpdateChannel(c)
 					continue
-				} else {
-					c.Model = "Directory " + c.Model
-					c.Status = "NoParent"
 				}
 			}
 		}
