@@ -70,8 +70,8 @@ func (d *Device) syncChannels(conf config.GB28181Config) {
 func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) {
 	for _, c := range list {
 		//当父设备非空且存在时、父设备节点增加通道
-		if c.ParentID != "" {
-			path := strings.Split(c.ParentID, "/")
+		if c.ParentId != "" {
+			path := strings.Split(c.ParentId, "/")
 			parentId := path[len(path)-1]
 			//如果父ID并非本身所属设备，一般情况下这是因为下级设备上传了目录信息，该信息通常不需要处理。
 			// 暂时不考虑级联目录的实现
@@ -83,6 +83,7 @@ func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) 
 				}
 			}
 		}
+		c.ParentId = d.ID
 		//本设备增加通道
 		d.addOrUpdateChannel(c)
 		//channel.TryAutoInvite(&InviteOptions{}, conf)
@@ -90,7 +91,7 @@ func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) 
 }
 
 func (d *Device) addOrUpdateChannel(info ChannelInfo) (c *Channel) {
-	if old, ok := d.channelMap.Load(info.DeviceID); ok {
+	if old, ok := d.channelMap.Load(info.ChannelId); ok {
 		c = old.(*Channel)
 		c.ChannelInfo = info
 	} else {
@@ -98,7 +99,7 @@ func (d *Device) addOrUpdateChannel(info ChannelInfo) (c *Channel) {
 			device:      d,
 			ChannelInfo: info,
 		}
-		d.channelMap.Store(info.DeviceID, c)
+		d.channelMap.Store(info.ChannelId, c)
 	}
 	return
 }
@@ -218,21 +219,21 @@ func (d *Device) UpdateChannelStatus(deviceList []*notifyMessage, conf config.GB
 		switch v.Event {
 		case "ON":
 			nazalog.Debug("receive channel online notify")
-			d.channelOnline(v.DeviceID)
+			d.channelOnline(v.ChannelId)
 		case "OFF":
 			nazalog.Debug("receive channel offline notify")
-			d.channelOffline(v.DeviceID)
+			d.channelOffline(v.ChannelId)
 		case "VLOST":
 			nazalog.Debug("receive channel video lost notify")
-			d.channelOffline(v.DeviceID)
+			d.channelOffline(v.ChannelId)
 		case "DEFECT":
 			nazalog.Debug("receive channel video defect notify")
-			d.channelOffline(v.DeviceID)
+			d.channelOffline(v.ChannelId)
 		case "ADD":
 			nazalog.Debug("receive channel add notify")
 			channel := ChannelInfo{
-				DeviceID:     v.DeviceID,
-				ParentID:     v.ParentID,
+				ChannelId:    v.ChannelId,
+				ParentId:     v.ParentId,
 				Name:         v.Name,
 				Manufacturer: v.Manufacturer,
 				Model:        v.Model,
@@ -244,19 +245,21 @@ func (d *Device) UpdateChannelStatus(deviceList []*notifyMessage, conf config.GB
 				SafetyWay:    v.SafetyWay,
 				RegisterWay:  v.RegisterWay,
 				Secrecy:      v.Secrecy,
-				Status:       ChannelStatus(v.Status),
+				Status:       v.Status,
+				Longitude:    v.Longitude,
+				Latitude:     v.Latitude,
 			}
 			d.addOrUpdateChannel(channel)
 		case "DEL":
 			//删除
 			nazalog.Debug("receive channel delete notify")
-			d.deleteChannel(v.DeviceID)
+			d.deleteChannel(v.ChannelId)
 		case "UPDATE":
 			nazalog.Debug("receive channel update notify")
 			// 更新通道
 			channel := ChannelInfo{
-				DeviceID:     v.DeviceID,
-				ParentID:     v.ParentID,
+				ChannelId:    v.ChannelId,
+				ParentId:     v.ParentId,
 				Name:         v.Name,
 				Manufacturer: v.Manufacturer,
 				Model:        v.Model,
@@ -268,35 +271,37 @@ func (d *Device) UpdateChannelStatus(deviceList []*notifyMessage, conf config.GB
 				SafetyWay:    v.SafetyWay,
 				RegisterWay:  v.RegisterWay,
 				Secrecy:      v.Secrecy,
-				Status:       ChannelStatus(v.Status),
+				Status:       v.Status,
+				Longitude:    v.Longitude,
+				Latitude:     v.Latitude,
 			}
 			d.UpdateChannels(conf, channel)
 		}
 	}
 }
 
-func (d *Device) channelOnline(DeviceID string) {
-	if v, ok := d.channelMap.Load(DeviceID); ok {
+func (d *Device) channelOnline(channelId string) {
+	if v, ok := d.channelMap.Load(channelId); ok {
 		c := v.(*Channel)
 		c.Status = ChannelOnStatus
-		nazalog.Debug("channel online, channelId: ", DeviceID)
+		nazalog.Debug("channel online, channelId: ", channelId)
 	} else {
-		nazalog.Debug("update channel status failed, not found, channelId: ", DeviceID)
+		nazalog.Debug("update channel status failed, not found, channelId: ", channelId)
 	}
 }
 
-func (d *Device) channelOffline(DeviceID string) {
-	if v, ok := d.channelMap.Load(DeviceID); ok {
+func (d *Device) channelOffline(channelId string) {
+	if v, ok := d.channelMap.Load(channelId); ok {
 		c := v.(*Channel)
 		c.Status = ChannelOffStatus
-		nazalog.Debug("channel offline, channelId: ", DeviceID)
+		nazalog.Debug("channel offline, channelId: ", channelId)
 	} else {
-		nazalog.Debug("update channel status failed, not found, channelId: ", DeviceID)
+		nazalog.Debug("update channel status failed, not found, channelId: ", channelId)
 	}
 }
 
-func (d *Device) deleteChannel(DeviceID string) {
-	d.channelMap.Delete(DeviceID)
+func (d *Device) deleteChannel(channelId string) {
+	d.channelMap.Delete(channelId)
 }
 
 // UpdateChannelPosition 更新通道GPS坐标
