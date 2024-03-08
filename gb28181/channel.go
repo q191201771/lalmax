@@ -66,7 +66,7 @@ func (channel *Channel) CanInvite(streamName string) bool {
 	}
 	d := channel.device
 
-	if d.mediaInfo.Ssrc > 0 {
+	if d.mediaInfo.IsInvite {
 		return false
 	}
 
