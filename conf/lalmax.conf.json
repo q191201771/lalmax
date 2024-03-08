@@ -26,12 +26,16 @@
       "enable": true,
       "serial": "34020000002000000001",
       "realm": "3402000000",
-      "sipIp": "100.100.100.100",
-      "sipPort": 5060,
       "sipNetwork": "tcp",
+      "sipIp": "100.100.108.230",
+      "sipPort": 5060,
       "username": "",
-      "streamIp": "100.100.100.100",
-	  "quickLogin": true
+	    "quickLogin": true,
+      "media_config": {
+        "mediaIp": "100.100.108.230",
+        "tcp_listen_port": 30000,
+        "udp_listen_port": 30000
+      }
     },
     "onvif_config": {
       "enable": true

@@ -1,8 +1,9 @@
 package gb28181
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type DeviceInfos struct {
@@ -25,9 +26,10 @@ type ChannelItem struct {
 	StreamName   string        `json:"-"`
 }
 type PlayInfo struct {
-	DeviceId   string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
-	ChannelId  string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
-	StreamName string `json:"stream_name" form:"stream_name" url:"stream_name"`
+	NetWork    string `json:"network" form:"network" url:"network"`             // 媒体传输类型,tcp/udp,默认udp
+	DeviceId   string `json:"device_id" form:"device_id" url:"device_id"`       // 设备 Id
+	ChannelId  string `json:"channel_id" form:"channel_id" url:"channel_id"`    // channel id
+	StreamName string `json:"stream_name" form:"stream_name" url:"stream_name"` // ssrc对应的流名
 }
 type ReqPlay struct {
 	PlayInfo

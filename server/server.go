@@ -66,7 +66,7 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 	}
 
 	if conf.GB28181Config.Enable {
-		maxsvr.gbsbr = gb28181.NewGB28181Server(conf.GB28181Config)
+		maxsvr.gbsbr = gb28181.NewGB28181Server(conf.GB28181Config, lalsvr)
 	}
 
 	if conf.OnvifConfig.Enable {

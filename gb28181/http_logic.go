@@ -1,8 +1,9 @@
 package gb28181
 
 import (
-	"github.com/gin-gonic/gin"
 	"sync"
+
+	"github.com/gin-gonic/gin"
 )
 
 type GbLogic struct {
@@ -39,7 +40,7 @@ func (g *GbLogic) StartPlay(c *gin.Context) {
 			if len(streamName) == 0 {
 				streamName = reqPlay.ChannelId
 			}
-			ch.TryAutoInvite(&InviteOptions{}, g.s.conf, streamName)
+			ch.TryAutoInvite(&InviteOptions{}, g.s.conf, streamName, reqPlay.NetWork)
 			respPlay := &RespPlay{
 				StreamName: streamName,
 			}
@@ -56,7 +57,6 @@ func (g *GbLogic) StopPlay(c *gin.Context) {
 		ch := g.s.FindChannel(reqStop.DeviceId, reqStop.ChannelId)
 		if ch == nil {
 			ResponseErrorWithMsg(c, CodeDeviceNotRegister, CodeDeviceNotRegister.Msg())
-
 		} else {
 			streamName := reqStop.StreamName
 			if len(streamName) == 0 {
@@ -67,7 +67,6 @@ func (g *GbLogic) StopPlay(c *gin.Context) {
 			} else {
 				ResponseSuccess(c, nil)
 			}
-
 		}
 	}
 
