@@ -72,6 +72,8 @@ func (s *GB28181MediaServer) Start() (err error) {
 			}
 
 			c := NewConn(conn, s.lalServer)
+			c.CheckSsrc = s.CheckSsrc
+			c.NotifyClose = s.NotifyClose
 			go c.Serve()
 		}
 
@@ -89,5 +91,8 @@ func (s *GB28181MediaServer) CheckSsrc(ssrc uint32) (string, bool) {
 }
 
 func (s *GB28181MediaServer) NotifyClose(streamName string) {
+	if s.NotifyCloseFunc != nil {
+		s.NotifyCloseFunc(streamName)
+	}
 
 }
