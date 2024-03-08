@@ -54,8 +54,11 @@ type Device struct {
 	GpsTime      time.Time //gps时间
 	Longitude    string    //经度
 	Latitude     string    //纬度
-	ApiPort      uint16
-	ApiSsl       bool //流媒体 Api 是否ssl
+	mediaInfo    struct {
+		IsInvite   bool
+		Ssrc       uint32
+		StreamName string
+	}
 }
 
 func (d *Device) syncChannels(conf config.GB28181Config) {

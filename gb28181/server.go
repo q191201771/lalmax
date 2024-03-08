@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	config "lalmax/conf"
+	"lalmax/gb28181/mediaserver"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"github.com/ghettovoice/gosip"
 	"github.com/ghettovoice/gosip/log"
 	"github.com/ghettovoice/gosip/sip"
+	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -26,6 +28,7 @@ type GB28181Server struct {
 	HeartbeatInterval time.Duration // 心跳间隔，单位秒，默认 60
 	RemoveBanInterval time.Duration // 移除禁止设备间隔,默认600s
 	keepaliveInterval int
+	lalServer         logic.ILalServer
 }
 
 const MaxRegisterCount = 3
@@ -39,7 +42,7 @@ func init() {
 	logger = log.NewDefaultLogrusLogger().WithPrefix("LalMaxServer")
 }
 
-func NewGB28181Server(conf config.GB28181Config) *GB28181Server {
+func NewGB28181Server(conf config.GB28181Config, lal logic.ILalServer) *GB28181Server {
 	if conf.ListenAddr == "" {
 		conf.ListenAddr = "0.0.0.0"
 	}
@@ -61,15 +64,26 @@ func NewGB28181Server(conf config.GB28181Config) *GB28181Server {
 	if conf.Realm == "" {
 		conf.Realm = "3402000000"
 	}
-	if conf.ApiPort == 0 {
-		conf.ApiPort = 8083
+
+	if conf.MediaConfig.MediaIp == "" {
+		conf.MediaConfig.MediaIp = "0.0.0.0"
 	}
+
+	if conf.MediaConfig.TCPListenPort == 0 {
+		conf.MediaConfig.TCPListenPort = 30000
+	}
+
+	if conf.MediaConfig.UDPListenPort == 0 {
+		conf.MediaConfig.UDPListenPort = 30000
+	}
+
 	return &GB28181Server{
 		conf:              conf,
 		RegisterValidity:  3600 * time.Second,
 		HeartbeatInterval: 60 * time.Second,
 		RemoveBanInterval: 600 * time.Second,
 		keepaliveInterval: conf.KeepaliveInterval,
+		lalServer:         lal,
 	}
 }
 
@@ -80,6 +94,11 @@ func (s *GB28181Server) Start() {
 		srvConf.Host = s.conf.SipIP
 	}
 
+	mediasvr := mediaserver.NewGB28181MediaServer(fmt.Sprintf(":%d", s.conf.MediaConfig.TCPListenPort), fmt.Sprintf(":%d", s.conf.MediaConfig.UDPListenPort), s.lalServer)
+	mediasvr.CheckSsrcFunc = s.CheckSsrc
+	mediasvr.NotifyCloseFunc = s.NotifyClose
+	go mediasvr.Start()
+
 	sipsvr = gosip.NewServer(srvConf, nil, nil, logger)
 	sipsvr.OnRequest(sip.REGISTER, s.OnRegister)
 	sipsvr.OnRequest(sip.MESSAGE, s.OnMessage)
@@ -87,9 +106,48 @@ func (s *GB28181Server) Start() {
 	sipsvr.OnRequest(sip.BYE, s.OnBye)
 
 	addr := s.conf.ListenAddr + ":" + strconv.Itoa(int(s.conf.SipPort))
-	sipsvr.Listen(s.conf.SipNetwork, addr)
+	err := sipsvr.Listen(s.conf.SipNetwork, addr)
+	if err != nil {
+		nazalog.Fatal(err)
+	}
+
+	nazalog.Info("gb28181 sip listen success, network:", s.conf.SipNetwork, " listen addr:", addr)
 
 	go s.startJob()
+}
+
+func (s *GB28181Server) CheckSsrc(ssrc uint32) (string, bool) {
+	var isValidSsrc bool
+	var streamName string
+
+	Devices.Range(func(_, value any) bool {
+		d := value.(*Device)
+		if d.mediaInfo.Ssrc == ssrc {
+			isValidSsrc = true
+			streamName = d.mediaInfo.StreamName
+		}
+
+		return true
+	})
+
+	if isValidSsrc {
+		return streamName, true
+	}
+
+	return "", false
+}
+
+func (s *GB28181Server) NotifyClose(streamName string) {
+	Devices.Range(func(_, value any) bool {
+		d := value.(*Device)
+		if d.mediaInfo.StreamName == streamName {
+			d.mediaInfo.IsInvite = false
+			d.mediaInfo.Ssrc = 0
+			d.mediaInfo.StreamName = ""
+		}
+
+		return true
+	})
 }
 
 func (s *GB28181Server) startJob() {
@@ -464,9 +522,7 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 		servIp := req.Recipient().Host()
 
 		sipIp := s.conf.SipIP
-		mediaIp := s.conf.StreamIP
-		apiPort := s.conf.ApiPort
-		apiSsl := s.conf.ApiSsl
+		mediaIp := s.conf.MediaConfig.MediaIp
 		d = &Device{
 			ID:           id,
 			RegisterTime: time.Now(),
@@ -476,8 +532,6 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 			sipIP:        sipIp,
 			mediaIP:      mediaIp,
 			NetAddr:      deviceIp,
-			ApiPort:      apiPort,
-			ApiSsl:       apiSsl,
 		}
 		nazalog.Info("StoreDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
 		Devices.Store(id, d)

@@ -1,10 +1,7 @@
 package gb28181
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	config "lalmax/conf"
 	"net/http"
 	"strconv"
@@ -12,17 +9,15 @@ import (
 	"time"
 
 	"github.com/ghettovoice/gosip/sip"
-	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazalog"
 )
 
 type Channel struct {
 	device *Device // 所属设备
 	//status  atomic.Int32 // 通道状态,0:空闲,1:正在invite,2:正在播放
-	GpsTime   time.Time // gps时间
-	number    uint16
-	sessionId string
-	ackReq    sip.Request
+	GpsTime time.Time // gps时间
+	number  uint16
+	ackReq  sip.Request
 	ChannelInfo
 }
 
@@ -54,9 +49,9 @@ const (
 	ChannelOffStatus = "OFF"
 )
 
-func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName string) {
+func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName, network string) {
 	if channel.CanInvite(streamName) {
-		go channel.Invite(opt, conf, streamName)
+		go channel.Invite(opt, conf, streamName, network)
 	}
 }
 
@@ -69,12 +64,9 @@ func (channel *Channel) CanInvite(streamName string) bool {
 		return false
 	}
 	d := channel.device
-	//通过lal api是否有流信息
-	if d.DoLalGroupInfo(streamName) != nil {
+
+	if d.mediaInfo.IsInvite {
 		return false
-	} else {
-		channel.ackReq = nil
-		channel.sessionId = ""
 	}
 
 	// 11～13位是设备类型编码
@@ -135,7 +127,7 @@ f字段中视、音频参数段之间不需空格分割。
 可使用f字段中的分辨率参数标识同一设备不同分辨率的码流。
 */
 
-func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName string) (code int, err error) {
+func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName, network string) (code int, err error) {
 	d := channel.device
 	s := "Play"
 
@@ -147,21 +139,13 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	opt.CreateSSRC(channel.ChannelId, channel.number)
 
 	protocol := ""
-	networkType := conf.SipNetwork
+	nazalog.Info("networkType:", network)
 
-	nazalog.Info("networkType:", networkType)
-
-	// 获取lal的端口
-	ctrlStartRtpPubResp, err := d.DoLalStartRtpPub(streamName, networkType)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	if ctrlStartRtpPubResp.ApiRespBasic.ErrorCode != 0 {
-		return http.StatusInternalServerError, fmt.Errorf("start rtp pub error: %v", ctrlStartRtpPubResp.ApiRespBasic.ErrorCode)
-	}
-	opt.MediaPort = uint16(ctrlStartRtpPubResp.Data.Port)
-	if networkType == "tcp" {
+	if network == "tcp" {
+		opt.MediaPort = conf.MediaConfig.TCPListenPort
 		protocol = "TCP/"
+	} else {
+		opt.MediaPort = conf.MediaConfig.UDPListenPort
 	}
 
 	sdpInfo := []string{
@@ -176,7 +160,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 		"y=" + opt.ssrc,
 	}
 
-	if networkType == "tcp" {
+	if network == "tcp" {
 		sdpInfo = append(sdpInfo, "a=setup:passive", "a=connection:new")
 	}
 
@@ -216,13 +200,17 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 						nazalog.Info("Device support tcp")
 					} else {
 						nazalog.Info("Device not support tcp")
-						networkType = "udp"
+						network = "udp"
 					}
 				}
 			}
 		}
+
+		d.mediaInfo.IsInvite = true
+		d.mediaInfo.Ssrc = opt.SSRC
+		d.mediaInfo.StreamName = streamName
+
 		ackReq := sip.NewAckRequest("", invite, inviteRes, "", nil)
-		channel.sessionId = ctrlStartRtpPubResp.Data.SessionId
 		channel.ackReq = ackReq
 
 		err = sipsvr.Send(ackReq)
@@ -237,12 +225,6 @@ func (channel *Channel) Bye(streamName string) (err error) {
 		seq.SeqNo += 1
 		err = sipsvr.Send(byeReq)
 		if err == nil {
-			if channel.sessionId != "" {
-				d := channel.device
-				if err = d.DoLalKickSession(streamName, channel.sessionId); err == nil {
-					channel.sessionId = ""
-				}
-			}
 			channel.ackReq = nil
 		}
 	}
@@ -304,113 +286,4 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 	req.SetTransport(conf.SipNetwork)
 	req.SetDestination(d.NetAddr)
 	return req
-}
-
-func (d *Device) DoLalStartRtpPub(deviceId, networkType string) (*base.ApiCtrlStartRtpPubResp, error) {
-	request := &base.ApiCtrlStartRtpPubReq{
-		StreamName: deviceId,
-	}
-
-	if networkType == "tcp" {
-		request.IsTcpFlag = 1
-	}
-
-	data, _ := json.Marshal(request)
-	url := ""
-	if d.ApiSsl {
-		url = fmt.Sprintf("https://%s:%d/api/ctrl/start_rtp_pub", d.mediaIP, d.ApiPort)
-	} else {
-		url = fmt.Sprintf("http://%s:%d/api/ctrl/start_rtp_pub", d.mediaIP, d.ApiPort)
-	}
-	body, err := d.DoLalHttpReq("POST", url, data)
-	if err != nil {
-		return nil, err
-	}
-	response := &base.ApiCtrlStartRtpPubResp{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return nil, err
-	}
-
-	nazalog.Info("start_rtp_pub response:", response)
-
-	return response, nil
-}
-func (d *Device) DoLalGroupInfo(deviceId string) error {
-	url := ""
-	if d.ApiSsl {
-		url = fmt.Sprintf("https://%s:%d/api/stat/group?stream_name=%s", d.mediaIP, d.ApiPort, deviceId)
-	} else {
-		url = fmt.Sprintf("http://%s:%d/api/stat/group?stream_name=%s", d.mediaIP, d.ApiPort, deviceId)
-	}
-	body, err := d.DoLalHttpReq("GET", url, nil)
-	if err != nil {
-		return err
-	}
-	response := &base.ApiStatGroupResp{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return err
-	}
-	if response.ApiRespBasic.ErrorCode == 1001 {
-		return nil
-	} else {
-		return fmt.Errorf("stat group error: %v", response.ApiRespBasic.ErrorCode)
-	}
-}
-func (d *Device) DoLalKickSession(streamName, sessionId string) error {
-	url := ""
-	if d.ApiSsl {
-		url = fmt.Sprintf("https://%s:%d/api/ctrl/kick_session", d.mediaIP, d.ApiPort)
-	} else {
-		url = fmt.Sprintf("http://%s:%d/api/ctrl/kick_session", d.mediaIP, d.ApiPort)
-	}
-	request := &base.ApiCtrlKickSessionReq{
-		StreamName: streamName,
-		SessionId:  sessionId,
-	}
-	data, _ := json.Marshal(request)
-	body, err := d.DoLalHttpReq("POST", url, data)
-	if err != nil {
-		return err
-	}
-	response := &base.ApiRespBasic{}
-	err = json.Unmarshal(body, &response)
-	if err != nil {
-		return err
-	}
-	if response.ErrorCode == 0 {
-		return nil
-	} else {
-		return fmt.Errorf("kick session error: %v", response.ErrorCode)
-	}
-}
-func (d *Device) DoLalHttpReq(method string, url string, reqBody []byte) (respBody []byte, err error) {
-	req, err := http.NewRequest(method, url, bytes.NewReader(reqBody))
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	cli := &http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   time.Duration(5) * time.Second,
-	}
-
-	resp, err := cli.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Response is not 200: %v", resp.Status)
-	}
-
-	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	return body, err
 }
