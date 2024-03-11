@@ -106,9 +106,9 @@ http(s)://127.0.0.1:1290/live/m4s/test110.mp4
 http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 
 ## [GB28181](./document/gb28181.md)
-(1) 作为SIP服务器与设备进行SIP交互,打开lalserver的端口接收码流
+(1) 作为SIP服务器与设备进行SIP交互,使用单端口收流
 
-(2) 流ID为设备通道编码ID
+(2) 提供相关API获取设备信息、播放某通道等功能
 
 (3) 支持H264/H265/AAC
 

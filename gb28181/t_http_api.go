@@ -10,16 +10,16 @@ type DeviceInfos struct {
 	DeviceItems []*DeviceItem `json:"device_items"`
 }
 type DeviceItem struct {
-	DeviceId string         `json:"device_id"` //父目录Id
+	DeviceId string         `json:"device_id"` // 设备ID
 	Channels []*ChannelItem `json:"channels"`
 }
 type ChannelItem struct {
 	ChannelId    string        `json:"channel_id"`   // channel id
-	Name         string        `json:"name"`         //设备名称
-	Manufacturer string        `json:"manufacturer"` //制造厂商
-	Owner        string        `json:"owner"`        //设备归属
-	CivilCode    string        `json:"civilCode"`    //行政区划编码
-	Address      string        `json:"address"`      //地址
+	Name         string        `json:"name"`         // 设备名称
+	Manufacturer string        `json:"manufacturer"` // 制造厂商
+	Owner        string        `json:"owner"`        // 设备归属
+	CivilCode    string        `json:"civilCode"`    // 行政区划编码
+	Address      string        `json:"address"`      // 地址
 	Status       ChannelStatus `json:"status"`       // 状态  on 在线 off离线
 	Longitude    string        `json:"longitude"`    // 经度
 	Latitude     string        `json:"latitude"`     // 纬度
