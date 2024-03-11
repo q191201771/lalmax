@@ -40,6 +40,7 @@ type ChannelInfo struct {
 	Longitude    string        `xml:"Longitude"`    // 经度
 	Latitude     string        `xml:"Latitude"`     // 纬度
 	StreamName   string        `xml:"-"`
+	serial       string
 }
 
 type ChannelStatus string
@@ -131,12 +132,15 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	d := channel.device
 	s := "Play"
 
-	//依据deviceId生成ssrc,取设备ID最后六位，然后按顺序生成，一个channel最大999 方便排查问题,也能保证唯一性
+	//然后按顺序生成，一个channel最大999 方便排查问题,也能保证唯一性
 	channel.number++
 	if channel.number > 999 {
 		channel.number = 1
 	}
-	opt.CreateSSRC(channel.ChannelId, channel.number)
+	if len(channel.serial) == 0 {
+		channel.serial = RandNumString(6)
+	}
+	opt.CreateSSRC(channel.serial, channel.number)
 
 	protocol := ""
 	nazalog.Info("networkType:", network)
@@ -174,7 +178,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	invite.SetBody(strings.Join(sdpInfo, "\r\n")+"\r\n", true)
 
 	subject := sip.GenericHeader{
-		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.ChannelId, opt.ssrc, ""),
+		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.ChannelId, opt.ssrc, conf.Serial),
 	}
 	invite.AppendHeader(&subject)
 	inviteRes, err := d.SipRequestForResponse(invite)
