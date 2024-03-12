@@ -80,8 +80,12 @@ func (g *GbLogic) UpdateNotify(c *gin.Context) {
 	if err := c.ShouldBindJSON(&reqUpdateNotify); err != nil {
 		ResponseErrorWithMsg(c, CodeInvalidParam, CodeInvalidParam.Msg())
 	} else {
-		g.s.GetSyncChannels(reqUpdateNotify.DeviceId)
-		ResponseSuccess(c, nil)
+		if g.s.GetSyncChannels(reqUpdateNotify.DeviceId) {
+			ResponseSuccess(c, nil)
+		} else {
+			ResponseErrorWithMsg(c, CodeDeviceNotRegister, CodeDeviceNotRegister.Msg())
+		}
+
 	}
 
 }

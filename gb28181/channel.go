@@ -1,6 +1,7 @@
 package gb28181
 
 import (
+	"errors"
 	"fmt"
 	config "lalmax/conf"
 	"net/http"
@@ -41,6 +42,11 @@ type ChannelInfo struct {
 	Latitude     string        `xml:"Latitude"`     // 纬度
 	StreamName   string        `xml:"-"`
 	serial       string
+	mediaInfo    struct {
+		IsInvite   bool
+		Ssrc       uint32
+		StreamName string
+	}
 }
 
 type ChannelStatus string
@@ -64,9 +70,8 @@ func (channel *Channel) CanInvite(streamName string) bool {
 	if channel.Parental != 0 {
 		return false
 	}
-	d := channel.device
 
-	if d.mediaInfo.IsInvite {
+	if channel.mediaInfo.IsInvite {
 		return false
 	}
 
@@ -210,9 +215,9 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 			}
 		}
 
-		d.mediaInfo.IsInvite = true
-		d.mediaInfo.Ssrc = opt.SSRC
-		d.mediaInfo.StreamName = streamName
+		channel.mediaInfo.IsInvite = true
+		channel.mediaInfo.Ssrc = opt.SSRC
+		channel.mediaInfo.StreamName = streamName
 
 		ackReq := sip.NewAckRequest("", invite, inviteRes, "", nil)
 		channel.ackReq = ackReq
@@ -231,8 +236,11 @@ func (channel *Channel) Bye(streamName string) (err error) {
 		if err == nil {
 			channel.ackReq = nil
 		}
+		return err
+	} else {
+		return errors.New("channel has been closed")
 	}
-	return err
+
 }
 func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB28181Config) (req sip.Request) {
 	d := channel.device
