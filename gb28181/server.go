@@ -122,11 +122,15 @@ func (s *GB28181Server) CheckSsrc(ssrc uint32) (string, bool) {
 
 	Devices.Range(func(_, value any) bool {
 		d := value.(*Device)
-		if d.mediaInfo.Ssrc == ssrc {
-			isValidSsrc = true
-			streamName = d.mediaInfo.StreamName
-		}
-
+		d.channelMap.Range(func(key, value any) bool {
+			ch := value.(*Channel)
+			if ch.mediaInfo.Ssrc == ssrc {
+				isValidSsrc = true
+				streamName = ch.mediaInfo.StreamName
+				return false
+			}
+			return true
+		})
 		return true
 	})
 
@@ -140,11 +144,19 @@ func (s *GB28181Server) CheckSsrc(ssrc uint32) (string, bool) {
 func (s *GB28181Server) NotifyClose(streamName string) {
 	Devices.Range(func(_, value any) bool {
 		d := value.(*Device)
-		if d.mediaInfo.StreamName == streamName {
-			d.mediaInfo.IsInvite = false
-			d.mediaInfo.Ssrc = 0
-			d.mediaInfo.StreamName = ""
-		}
+		d.channelMap.Range(func(key, value any) bool {
+			ch := value.(*Channel)
+			if ch.mediaInfo.StreamName == streamName {
+				if ch.mediaInfo.IsInvite {
+					ch.Bye(streamName)
+				}
+				ch.mediaInfo.IsInvite = false
+				ch.mediaInfo.Ssrc = 0
+				ch.mediaInfo.StreamName = ""
+				return false
+			}
+			return true
+		})
 
 		return true
 	})
@@ -236,10 +248,13 @@ func (s *GB28181Server) GetAllSyncChannels() {
 		return true
 	})
 }
-func (s *GB28181Server) GetSyncChannels(deviceId string) {
+func (s *GB28181Server) GetSyncChannels(deviceId string) bool {
 	if v, ok := Devices.Load(deviceId); ok {
 		d := v.(*Device)
 		d.syncChannels(s.conf)
+		return true
+	} else {
+		return false
 	}
 }
 func (s *GB28181Server) FindChannel(deviceId string, channelId string) (channel *Channel) {
