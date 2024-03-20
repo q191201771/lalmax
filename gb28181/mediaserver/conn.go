@@ -56,11 +56,13 @@ func (c *Conn) Serve() (err error) {
 		nazalog.Info("conn close, err:", err)
 		c.conn.Close()
 
-		if c.NotifyClose != nil {
-			c.NotifyClose(c.streamName)
-		}
+		if c.check {
+			if c.NotifyClose != nil {
+				c.NotifyClose(c.streamName)
+			}
 
-		c.lalServer.DelCustomizePubSession(c.lalSession)
+			c.lalServer.DelCustomizePubSession(c.lalSession)
+		}
 	}()
 
 	nazalog.Info("gb28181 conn, remoteaddr:", c.conn.RemoteAddr().String(), " localaddr:", c.conn.LocalAddr().String())
