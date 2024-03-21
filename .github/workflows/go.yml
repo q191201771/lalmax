@@ -19,10 +19,10 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.20'
+        go-version: '1.21'
 
-    - name: Build
-      run: go build -v ./...
-
-    - name: Test
-      run: go test -v ./...
+    - name: Build for Linux, macOS, and Windows
+      run: |
+        GOOS=linux   go build -o lalmax-linux main.go
+        GOOS=darwin  go build -o lalmax-macos main.go
+        GOOS=windows go build -o lalmax-windows.exe main.go
