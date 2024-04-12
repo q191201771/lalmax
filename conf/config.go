@@ -8,14 +8,16 @@ import (
 var defaultConfig Config
 
 type Config struct {
-	SrtConfig        SrtConfig      `json:"srt_config"`      // srt配置
-	RtcConfig        RtcConfig      `json:"rtc_config"`      // rtc配置
-	HttpConfig       HttpConfig     `json:"http_config"`     // http/https配置
-	HttpFmp4Config   HttpFmp4Config `json:"httpfmp4_config"` // http-fmp4配置
-	HlsConfig        HlsConfig      `json:"hls_config"`      // hls-fmp4/llhls配置
-	GB28181Config    GB28181Config  `json:"gb28181_config"`  // gb28181配置
-	OnvifConfig      OnvifConfig    `json:"onvif_config"`    //
-	LalSvrConfigPath string         `json:"lal_config_path"` // lal配置目录
+	SrtConfig        SrtConfig        `json:"srt_config"`      // srt配置
+	RtcConfig        RtcConfig        `json:"rtc_config"`      // rtc配置
+	HttpConfig       HttpConfig       `json:"http_config"`     // http/https配置
+	HttpFmp4Config   HttpFmp4Config   `json:"httpfmp4_config"` // http-fmp4配置
+	HlsConfig        HlsConfig        `json:"hls_config"`      // hls-fmp4/llhls配置
+	GB28181Config    GB28181Config    `json:"gb28181_config"`  // gb28181配置
+	OnvifConfig      OnvifConfig      `json:"onvif_config"`    //
+	ServerId         string           `json:"server_id"`       // http 通知唯一标识
+	HttpNotifyConfig HttpNotifyConfig `json:"http_notify"`     // http 通知配置
+	LalSvrConfigPath string           `json:"lal_config_path"` // lal配置目录
 }
 
 type SrtConfig struct {
@@ -73,6 +75,21 @@ type GB28181MediaConfig struct {
 
 type OnvifConfig struct {
 	Enable bool `json:"enable"`
+}
+
+type HttpNotifyConfig struct {
+	Enable            bool   `json:"enable"`
+	UpdateIntervalSec int    `json:"update_interval_sec"`
+	OnServerStart     string `json:"on_server_start"`
+	OnUpdate          string `json:"on_update"`
+	OnPubStart        string `json:"on_pub_start"`
+	OnPubStop         string `json:"on_pub_stop"`
+	OnSubStart        string `json:"on_sub_start"`
+	OnSubStop         string `json:"on_sub_stop"`
+	OnRelayPullStart  string `json:"on_relay_pull_start"`
+	OnRelayPullStop   string `json:"on_relay_pull_stop"`
+	OnRtmpConnect     string `json:"on_rtmp_connect"`
+	OnHlsMakeTs       string `json:"on_hls_make_ts"`
 }
 
 func Open(filepath string) error {

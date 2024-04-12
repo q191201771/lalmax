@@ -2,9 +2,11 @@ package server
 
 import (
 	"lalmax/gb28181"
+	"lalmax/hook"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazalog"
 )
 
@@ -30,13 +32,19 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 		// onvif
 		router.POST("/api/ctrl/onvif/pull", s.HandleOnvifPull)
 
-		//gb
+		// gb
 		gbLogic := gb28181.NewGbLogic(s.gbsbr)
 		router.GET("/api/gb/device_infos", gbLogic.GetDeviceInfos)
 		router.POST("/api/gb/start_play", gbLogic.StartPlay)
 		router.POST("/api/gb/stop_play", gbLogic.StopPlay)
 		router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
 		router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
+
+		// stat
+		router.GET("/api/stat/group", s.statGroupHandler)
+		router.GET("/api/stat/all_group", s.statAllGroupHandler)
+		router.GET("/api/stat/lal_info", s.statLalInfoHandler)
+
 	}
 }
 func (s *LalMaxServer) Cors() gin.HandlerFunc {
@@ -107,4 +115,52 @@ func (s *LalMaxServer) HandleOnvifPull(c *gin.Context) {
 	if s.onvifsvr != nil {
 		s.onvifsvr.HandlePull(c)
 	}
+}
+
+func (s *LalMaxServer) statGroupHandler(c *gin.Context) {
+	var v base.ApiStatGroupResp
+	streamName := c.Query("stream_name")
+	if streamName == "" {
+		v.ErrorCode = base.ErrorCodeParamMissing
+		v.Desp = base.DespParamMissing
+		c.JSON(http.StatusOK, v)
+		return
+	}
+	v.Data = s.lalsvr.StatGroup(streamName)
+	if v.Data == nil {
+		v.ErrorCode = base.ErrorCodeGroupNotFound
+		v.Desp = base.DespGroupNotFound
+		c.JSON(http.StatusOK, v)
+		return
+	}
+	exist, session := hook.GetHookSessionManagerInstance().GetHookSession(streamName)
+	if exist {
+		v.Data.StatSubs = append(v.Data.StatSubs, session.GetAllConsumer()...)
+	}
+	v.ErrorCode = base.ErrorCodeSucc
+	v.Desp = base.DespSucc
+	c.JSON(http.StatusOK, v)
+}
+
+func (s *LalMaxServer) statAllGroupHandler(c *gin.Context) {
+	var out base.ApiStatAllGroupResp
+	out.ErrorCode = base.ErrorCodeSucc
+	out.Desp = base.DespSucc
+	groups := s.lalsvr.StatAllGroup()
+	for i, group := range groups {
+		exist, session := hook.GetHookSessionManagerInstance().GetHookSession(group.StreamName)
+		if exist {
+			groups[i].StatSubs = append(groups[i].StatSubs, session.GetAllConsumer()...)
+		}
+	}
+	out.Data.Groups = groups
+	c.JSON(http.StatusOK, out)
+}
+
+func (s *LalMaxServer) statLalInfoHandler(c *gin.Context) {
+	var v base.ApiStatLalInfoResp
+	v.ErrorCode = base.ErrorCodeSucc
+	v.Desp = base.DespSucc
+	v.Data = s.lalsvr.StatLalInfo()
+	c.JSON(http.StatusOK, v)
 }

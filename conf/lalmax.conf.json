@@ -1,43 +1,57 @@
 {
-    "srt_config": {
-      "enable": true,
-      "addr": ":6001"
+  "srt_config": {
+    "enable": true,
+    "addr": ":6001"
+  },
+  "rtc_config": {
+    "enable": true,
+    "iceHostNatToIps": [],
+    "iceUdpMuxPort": 4888,
+    "iceTcpMuxPort": 4888
+  },
+  "http_config": {
+    "http_listen_addr": ":1290",
+    "enable_https": true,
+    "https_listen_addr": ":1233",
+    "https_cert_file": "./conf/cert.pem",
+    "https_key_file": "./conf/key.pem"
+  },
+  "httpfmp4_config": {
+    "enable": true
+  },
+  "hls_config": {
+    "enable": true
+  },
+  "gb28181_config": {
+    "enable": true,
+    "serial": "34020000002000000001",
+    "realm": "3402000000",
+    "sipIp": "192.168.254.165",
+    "sipPort": 5060,
+    "sipNetwork": "udp",
+    "username": "",
+    "media_config": {
+      "mediaIp": "192.168.254.165"
     },
-    "rtc_config": {
-      "enable": true,
-      "iceHostNatToIps": [],
-      "iceUdpMuxPort": 4888,
-      "iceTcpMuxPort": 4888
-    },
-    "http_config": {
-      "http_listen_addr": ":1290",
-      "enable_https": true,
-      "https_listen_addr": ":1233",
-      "https_cert_file": "./conf/cert.pem",
-      "https_key_file": "./conf/key.pem"
-    },
-    "httpfmp4_config": {
-      "enable": true
-    },
-    "hls_config":{
-      "enable": true
-    },
-    "gb28181_config":{
-      "enable": true,
-      "serial": "34020000002000000001",
-      "realm": "3402000000",
-      "sipIp": "192.168.254.165",
-      "sipPort": 5060,
-      "sipNetwork": "udp",
-      "username": "",
-      "media_config": {
-        "mediaIp": "192.168.254.165"
-      },
-	  "quickLogin": true
-    },
-    "onvif_config": {
-      "enable": true
-    },
-    "lal_config_path:":"./conf/lalserver.conf.json"
+    "quickLogin": true
+  },
+  "onvif_config": {
+    "enable": true
+  },
+  "server_id": "1",
+  "http_notify": {
+    "enable": false,
+    "update_interval_sec": 5,
+    "on_update": "http://127.0.0.1:10101/on_update",
+    "on_pub_start": "http://127.0.0.1:10101/on_pub_start",
+    "on_pub_stop": "http://127.0.0.1:10101/on_pub_stop",
+    "on_sub_start": "http://127.0.0.1:10101/on_sub_start",
+    "on_sub_stop": "http://127.0.0.1:10101/on_sub_stop",
+    "on_relay_pull_start": "http://127.0.0.1:10101/on_relay_pull_start",
+    "on_relay_pull_stop": "http://127.0.0.1:10101/on_relay_pull_stop",
+    "on_rtmp_connect": "http://127.0.0.1:10101/on_rtmp_connect",
+    "on_server_start": "http://127.0.0.1:10101/on_server_start",
+    "on_hls_make_ts": "http://127.0.0.1:10101/on_hls_make_ts"
+  },
+  "lal_config_path:": "./conf/lalserver.conf.json"
 }
-
