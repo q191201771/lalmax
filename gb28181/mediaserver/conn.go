@@ -3,6 +3,7 @@ package mediaserver
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -13,6 +14,10 @@ import (
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
 	"github.com/yapingcat/gomedia/go-mpeg2"
+)
+
+var (
+	ErrInvalidPsData = errors.New("invalid mpegps data")
 )
 
 type Frame struct {
@@ -36,6 +41,7 @@ type Conn struct {
 
 	CheckSsrc   func(ssrc uint32) (string, bool)
 	NotifyClose func(streamName string)
+	buffer      *bytes.Buffer
 }
 
 func NewConn(conn net.Conn, lal logic.ILalServer) *Conn {
@@ -44,6 +50,7 @@ func NewConn(conn net.Conn, lal logic.ILalServer) *Conn {
 		r:         conn,
 		demuxer:   mpeg2.NewPSDemuxer(),
 		lalServer: lal,
+		buffer:    bytes.NewBuffer(nil),
 	}
 
 	c.demuxer.OnFrame = c.OnFrame
@@ -127,11 +134,40 @@ func (c *Conn) Serve() (err error) {
 			c.lalSession = session
 		}
 
-		if c.demuxer != nil {
-			c.demuxer.Input(pkt.Payload)
-		}
+		c.Demuxer(pkt.Payload)
 	}
 	return
+}
+
+func (c *Conn) Demuxer(data []byte) error {
+	c.buffer.Write(data)
+
+	buf := c.buffer.Bytes()
+	if len(buf) < 4 {
+		return nil
+	}
+
+	if buf[0] != 0x00 && buf[1] != 0x00 && buf[2] != 0x01 && buf[3] != 0xBA {
+		return ErrInvalidPsData
+	}
+
+	packets := splitPsPackets(buf)
+	if len(packets) <= 1 {
+		return nil
+	}
+
+	for i, packet := range packets {
+		if i == len(packets)-1 {
+			c.buffer = bytes.NewBuffer(packet)
+			return nil
+		}
+
+		if c.demuxer != nil {
+			c.demuxer.Input(packet)
+		}
+	}
+
+	return nil
 }
 
 func (c *Conn) OnFrame(frame []byte, cid mpeg2.PS_STREAM_TYPE, pts uint64, dts uint64) {
@@ -203,4 +239,22 @@ func getPayloadType(cid mpeg2.PS_STREAM_TYPE) base.AvPacketPt {
 	}
 
 	return base.AvPacketPtUnknown
+}
+
+func splitPsPackets(data []byte) [][]byte {
+	startCode := []byte{0x00, 0x00, 0x01, 0xBA}
+	start := 0
+	var packets [][]byte
+	for i := 0; i < len(data); i++ {
+		if i+len(startCode) <= len(data) && bytes.Equal(data[i:i+len(startCode)], startCode) {
+			if i == 0 {
+				continue
+			}
+			packets = append(packets, data[start:i])
+			start = i
+		}
+	}
+	packets = append(packets, data[start:])
+
+	return packets
 }
