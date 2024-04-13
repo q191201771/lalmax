@@ -1,0 +1,29 @@
+# https://github.com/wangyoucao577/go-release-action
+
+name: build-go-binary
+
+on:
+  release:
+    types: [created] # 表示在创建新的 Release 时触发
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-go-binary:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin] # 需要打包的系统
+        goarch: [amd64, arm64] # 需要打包的架构
+    steps:
+      - uses: actions/checkout@v4
+      - uses: wangyoucao577/go-release-action@v1.49
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          goos: ${{ matrix.goos }}
+          goarch: ${{ matrix.goarch }}
+          goversion: 1.22
+          md5sum: false
+          extra_files: ./README.md ./conf
