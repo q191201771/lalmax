@@ -2,6 +2,7 @@ package mpegps
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 )
@@ -96,7 +97,7 @@ func (ps_pkg_hdr *PSPackHeader) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 	if bs.Uint32(32) != 0x000001BA {
-		panic("ps header must start with 000001BA")
+		return errors.New("ps header must start with 000001BA")
 	}
 
 	if bs.NextBits(2) == 0x01 { //mpeg2
@@ -271,7 +272,7 @@ func (sh *System_header) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 	if bs.Uint32(32) != 0x000001BB {
-		panic("system header must start with 000001BB")
+		return errors.New("system header must start with 000001BB")
 	}
 	sh.Header_length = bs.Uint16(16)
 	if bs.RemainBytes() < int(sh.Header_length) {
@@ -414,11 +415,11 @@ func (psm *Program_stream_map) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 	if bs.Uint32(24) != 0x000001 {
-		panic("program stream map must startwith 0x000001")
+		return errors.New("program stream map must startwith 0x000001")
 	}
 	psm.Map_stream_id = bs.Uint8(8)
 	if psm.Map_stream_id != 0xBC {
-		panic("map stream id must be 0xBC")
+		return errors.New("map stream id must be 0xBC")
 	}
 	psm.Program_stream_map_length = bs.Uint16(16)
 	if bs.RemainBytes() < int(psm.Program_stream_map_length) {
@@ -436,9 +437,9 @@ func (psm *Program_stream_map) Decode(bs *BitStream) error {
 	}
 	bs.SkipBits(int(psm.Program_stream_info_length) * 8)
 	psm.Elementary_stream_map_length = bs.Uint16(16)
-	if psm.Program_stream_map_length != 6+psm.Program_stream_info_length+psm.Elementary_stream_map_length+4 {
-		return errParser
-	}
+
+	psm.Elementary_stream_map_length = psm.Program_stream_map_length - psm.Program_stream_info_length - 10
+
 	if bs.RemainBytes() < int(psm.Elementary_stream_map_length)+4 {
 		bs.UnRead(12*8 + int(psm.Program_stream_info_length)*8)
 		return errNeedMore
@@ -477,7 +478,7 @@ func (psd *Program_stream_directory) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 	if bs.Uint32(32) != 0x000001FF {
-		panic("program stream directory 000001FF")
+		return errors.New("program stream directory 000001FF")
 	}
 	psd.PES_packet_length = bs.Uint16(16)
 	if bs.RemainBytes() < int(psd.PES_packet_length) {

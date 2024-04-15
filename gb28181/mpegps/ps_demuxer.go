@@ -47,7 +47,7 @@ func NewPSDemuxer() *PSDemuxer {
 		OnPacket:  nil,
 	}
 	//兼容没有发送psm的ps包
-	streamH264 := newpsstream(uint8(PES_STREAM_VIDEO), PS_STREAM_UNKNOW)
+	streamH264 := newpsstream(uint8(PES_STREAM_VIDEO), PS_STREAM_H264)
 	psdemuxer.streamMap[streamH264.sid] = streamH264
 
 	return psdemuxer
@@ -150,7 +150,7 @@ func (psdemuxer *PSDemuxer) Input(data []byte) error {
 				}
 				if ret == nil {
 					if stream, found := psdemuxer.streamMap[psdemuxer.pkg.Pes.Stream_id]; found {
-						if stream.cid == PS_STREAM_UNKNOW {
+						if psdemuxer.mpeg1 && stream.cid == PS_STREAM_UNKNOW {
 							psdemuxer.guessCodecid(stream)
 						}
 						psdemuxer.demuxPespacket(stream, psdemuxer.pkg.Pes)
@@ -261,6 +261,7 @@ func (psdemuxer *PSDemuxer) demuxH26x(stream *psstream, pes *PesPacket) error {
 	if len(stream.streamBuf) == 0 {
 		stream.pts = pes.Pts
 		stream.dts = pes.Dts
+		stream.streamBuf = nil
 	}
 	stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
 	start, sc := FindStartCode(stream.streamBuf, 0)

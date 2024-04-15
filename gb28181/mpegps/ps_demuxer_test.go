@@ -88,14 +88,20 @@ func TestPSDemuxer_Input(t *testing.T) {
 }
 func TestPSDemuxer(t *testing.T) {
 	var psUnpacker *PSDemuxer
+	os.Remove("h.ps")
+	os.Remove("h.h264")
+	os.Remove("ps_demux_result")
 	dumpFile := base.NewDumpFile()
-	err := dumpFile.OpenToRead("C:\\Users\\Administrator\\Desktop\\34132311401328010001.raw")
+	err := dumpFile.OpenToRead("C:\\Users\\Administrator\\Desktop\\5_min_tcp_dump.raw")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	psUnpacker = NewPSDemuxer()
 	psUnpacker.OnFrame = func(frame []byte, cid PS_STREAM_TYPE, pts uint64, dts uint64) {
+		if cid == PS_STREAM_H264 || cid == PS_STREAM_H265 {
+			writeFile("h.h264", frame)
+		}
 
 	}
 	fd3, err := os.OpenFile("ps_demux_result", os.O_CREATE|os.O_RDWR, 0666)
@@ -140,8 +146,8 @@ func TestPSDemuxer(t *testing.T) {
 	if err != nil {
 		return
 	}
-	dump := false
 	packe := 0
+	Seq := 0
 	for {
 		m, err := dumpFile.ReadOneMessage()
 		if err == io.EOF {
@@ -154,23 +160,45 @@ func TestPSDemuxer(t *testing.T) {
 			continue
 		}
 		packe++
-		fmt.Printf("pkt Seq:%d ssrc:%d \n", ipkt.Header.Seq, ipkt.Header.Ssrc)
+		if ipkt.Header.Seq-uint16(Seq) != 1 {
+			fmt.Printf("pkt Seq:%d ssrc:%d \n", ipkt.Header.Seq, ipkt.Header.Ssrc)
+		}
+		Seq = int(ipkt.Header.Seq)
 		body := ipkt.Body()
-		if ipkt.Header.Mark == 1 {
-			dump = true
-			if packe == 1 {
-				if len(body) > 8 {
-					fmt.Println(hex.Dump(body[:8]))
-				}
-			}
-		}
-		if dump || packe > 1 {
-			dump = false
-			if len(body) > 8 {
-				fmt.Println(hex.Dump(body[:8]))
-			}
-		}
+		writeFile("h.ps", body)
 		fmt.Println(psUnpacker.Input(body))
 	}
 
+}
+func fileExists(fileName string) (bool, error) {
+	_, err := os.Stat(fileName)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+func writeFile(filename string, buffer []byte) (err error) {
+	var fp *os.File
+	b, err := fileExists(filename)
+	if err != nil {
+		return
+	}
+	if !b {
+		fp, err = os.Create(filename)
+		if err != nil {
+			return
+		}
+	} else {
+		fp, err = os.OpenFile(filename, os.O_CREATE|os.O_APPEND, 6)
+		if err != nil {
+			return
+		}
+	}
+	defer fp.Close()
+	_, err = fp.Write(buffer)
+
+	return
 }
