@@ -39,19 +39,22 @@ type Conn struct {
 	videoFrame Frame
 	audioFrame Frame
 
+	observer IGbObserver
+
 	rtpPts         uint64
 	psPtsZeroTimes int64
 
-	CheckSsrc   func(ssrc uint32) (string, bool)
-	NotifyClose func(streamName string)
-	buffer      *bytes.Buffer
+	psDumpFile *base.DumpFile
+
+	buffer *bytes.Buffer
 }
 
-func NewConn(conn net.Conn, lal logic.ILalServer) *Conn {
+func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
 	c := &Conn{
 		conn:      conn,
 		r:         conn,
 		demuxer:   mpegps.NewPSDemuxer(),
+		observer:  observer,
 		lalServer: lal,
 		buffer:    bytes.NewBuffer(nil),
 	}
@@ -66,13 +69,13 @@ func (c *Conn) Serve() (err error) {
 		nazalog.Info("conn close, err:", err)
 		c.conn.Close()
 
-		if c.check {
-			if c.NotifyClose != nil {
-				c.NotifyClose(c.streamName)
-			}
-
-			c.lalServer.DelCustomizePubSession(c.lalSession)
+		if c.observer != nil {
+			c.observer.NotifyClose(c.streamName)
 		}
+		if c.psDumpFile != nil {
+			c.psDumpFile.Close()
+		}
+		c.lalServer.DelCustomizePubSession(c.lalSession)
 	}()
 
 	nazalog.Info("gb28181 conn, remoteaddr:", c.conn.RemoteAddr().String(), " localaddr:", c.conn.LocalAddr().String())
@@ -81,7 +84,7 @@ func (c *Conn) Serve() (err error) {
 		c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		pkt := &rtp.Packet{}
 		if c.conn.RemoteAddr().Network() == "udp" {
-			buf := make([]byte, 1472)
+			buf := make([]byte, 1472*4)
 			n, err := c.conn.Read(buf)
 			if err != nil {
 				nazalog.Error("conn read failed, err:", err)
@@ -112,19 +115,24 @@ func (c *Conn) Serve() (err error) {
 			}
 		}
 
-		if !c.check && c.CheckSsrc != nil {
-			streamName, ok := c.CheckSsrc(pkt.SSRC)
+		if !c.check && c.observer != nil {
+			mediaInfo, ok := c.observer.CheckSsrc(pkt.SSRC)
 			if !ok {
 				nazalog.Error("invalid ssrc:", pkt.SSRC)
 				return fmt.Errorf("invalid ssrc:%d", pkt.SSRC)
 			}
 
 			c.check = true
-			c.streamName = streamName
-
+			c.streamName = mediaInfo.StreamName
+			if len(mediaInfo.DumpFileName) > 0 {
+				c.psDumpFile = base.NewDumpFile()
+				if err = c.psDumpFile.OpenToWrite(mediaInfo.DumpFileName); err != nil {
+					nazalog.Errorf("gb con dump file:%s", err.Error())
+				}
+			}
 			nazalog.Info("gb28181 ssrc check success, streamName:", c.streamName)
 
-			session, err := c.lalServer.AddCustomizePubSession(streamName)
+			session, err := c.lalServer.AddCustomizePubSession(mediaInfo.StreamName)
 			if err != nil {
 				nazalog.Error("lal server AddCustomizePubSession failed, err:", err)
 				return err
@@ -138,9 +146,11 @@ func (c *Conn) Serve() (err error) {
 		}
 		c.rtpPts = uint64(pkt.Header.Timestamp)
 		if c.demuxer != nil {
+			if c.psDumpFile != nil {
+				c.psDumpFile.WriteWithType(pkt.Payload, base.DumpTypePsRtpData)
+			}
 			c.demuxer.Input(pkt.Payload)
 		}
-		//c.Demuxer(pkt.Payload)
 	}
 	return
 }
