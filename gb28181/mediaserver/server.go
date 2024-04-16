@@ -12,6 +12,7 @@ import (
 
 type IGbObserver interface {
 	CheckSsrc(ssrc uint32) (*MediaInfo, bool)
+	GetMediaInfoByKey(key string) (*MediaInfo, bool)
 	NotifyClose(streamName string)
 }
 
@@ -23,13 +24,15 @@ type GB28181MediaServer struct {
 
 	disposeOnce sync.Once
 	observer    IGbObserver
+	mediaKey    string
 }
 
-func NewGB28181MediaServer(listenPort int, observer IGbObserver, lal logic.ILalServer) *GB28181MediaServer {
+func NewGB28181MediaServer(listenPort int, mediaKey string, observer IGbObserver, lal logic.ILalServer) *GB28181MediaServer {
 	return &GB28181MediaServer{
 		listenPort: listenPort,
 		lalServer:  lal,
 		observer:   observer,
+		mediaKey:   mediaKey,
 	}
 }
 func (s *GB28181MediaServer) GetListenerPort() uint16 {
@@ -55,6 +58,7 @@ func (s *GB28181MediaServer) Start(listener net.Listener) (err error) {
 				}
 
 				c := NewConn(conn, s.observer, s.lalServer)
+				c.SetKey(s.mediaKey)
 				go c.Serve()
 			}
 		}()

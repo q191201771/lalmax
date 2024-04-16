@@ -152,8 +152,6 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	}
 	opt.CreateSSRC(channel.serial, channel.number)
 
-	protocol := ""
-	nazalog.Info("networkType:", playInfo.NetWork)
 	var mediaserver *mediaserver.GB28181MediaServer
 	if channel.observer != nil {
 		mediaserver = channel.observer.OnStartMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId)
@@ -161,6 +159,8 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	if mediaserver == nil {
 		return http.StatusNotFound, err
 	}
+
+	protocol := ""
 	if playInfo.NetWork == "tcp" {
 		opt.MediaPort = mediaserver.GetListenerPort()
 		protocol = "TCP/"
@@ -220,7 +220,6 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 						nazalog.Info("Device support tcp")
 					} else {
 						nazalog.Info("Device not support tcp")
-						playInfo.NetWork = "udp"
 					}
 				}
 			}
@@ -228,6 +227,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 		channel.MediaInfo.IsInvite = true
 		channel.MediaInfo.Ssrc = opt.SSRC
 		channel.MediaInfo.StreamName = streamName
+		channel.MediaInfo.MediaKey = fmt.Sprintf("%s%d", playInfo.NetWork, mediaserver.GetListenerPort())
 
 		ackReq := sip.NewAckRequest("", invite, inviteRes, "", nil)
 		//保存一下播放信息

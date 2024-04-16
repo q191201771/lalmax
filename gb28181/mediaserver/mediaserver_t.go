@@ -6,6 +6,7 @@ type MediaInfo struct {
 	StreamName   string
 	SinglePort   bool
 	DumpFileName string
+	MediaKey     string
 }
 
 func (m *MediaInfo) Clear() (err error) {

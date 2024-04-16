@@ -47,6 +47,7 @@ type Conn struct {
 	psDumpFile *base.DumpFile
 
 	buffer *bytes.Buffer
+	key    string
 }
 
 func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
@@ -63,7 +64,9 @@ func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
 
 	return c
 }
-
+func (c *Conn) SetKey(key string) {
+	c.key = key
+}
 func (c *Conn) Serve() (err error) {
 	defer func() {
 		nazalog.Info("conn close, err:", err)
@@ -116,12 +119,21 @@ func (c *Conn) Serve() (err error) {
 		}
 
 		if !c.check && c.observer != nil {
-			mediaInfo, ok := c.observer.CheckSsrc(pkt.SSRC)
-			if !ok {
-				nazalog.Error("invalid ssrc:", pkt.SSRC)
-				return fmt.Errorf("invalid ssrc:%d", pkt.SSRC)
+			var mediaInfo *MediaInfo
+			var ok bool
+			if pkt.SSRC != 0 {
+				mediaInfo, ok = c.observer.CheckSsrc(pkt.SSRC)
+				if !ok {
+					nazalog.Error("invalid ssrc:", pkt.SSRC)
+					return fmt.Errorf("invalid ssrc:%d", pkt.SSRC)
+				}
+			} else {
+				mediaInfo, ok = c.observer.GetMediaInfoByKey(c.key)
+				if !ok {
+					nazalog.Error("get mediaInfo :", c.key)
+					return fmt.Errorf("get mediaInfo:%d", c.key)
+				}
 			}
-
 			c.check = true
 			c.streamName = mediaInfo.StreamName
 			if len(mediaInfo.DumpFileName) > 0 {
