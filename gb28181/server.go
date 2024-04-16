@@ -176,8 +176,8 @@ func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, devi
 	var port uint16
 	if mediasvr == nil {
 		if singlePort {
-			mediasvr = mediaserver.NewGB28181MediaServer(int(s.conf.MediaConfig.ListenPort), s, s.lalServer)
 			if isTcpFlag {
+				mediasvr = mediaserver.NewGB28181MediaServer(int(s.conf.MediaConfig.ListenPort), fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort), s, s.lalServer)
 				listener, err = s.tcpAvailConnPool.ListenWithPort(s.conf.MediaConfig.ListenPort)
 				if err != nil {
 					nazalog.Error("gb28181 media server tcp Listen failed:%s", err.Error())
@@ -185,6 +185,7 @@ func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, devi
 				}
 				s.MediaServerMap.Store(fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort), mediasvr)
 			} else {
+				mediasvr = mediaserver.NewGB28181MediaServer(int(s.conf.MediaConfig.ListenPort), fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort), s, s.lalServer)
 				listener, err = s.udpAvailConnPool.ListenWithPort(s.conf.MediaConfig.ListenPort)
 				if err != nil {
 					nazalog.Error("gb28181 media server udp Listen failed:%s", err.Error())
@@ -193,20 +194,23 @@ func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, devi
 				s.MediaServerMap.Store(fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort), mediasvr)
 			}
 		} else {
+			mediaKey := ""
 			if isTcpFlag {
 				listener, port, err = s.tcpAvailConnPool.Acquire()
 				if err != nil {
 					nazalog.Error("gb28181 media server tcp acquire failed:%s", err.Error())
 					return nil
 				}
+				mediaKey = fmt.Sprintf("%s%d", "tcp", port)
 			} else {
 				listener, port, err = s.udpAvailConnPool.Acquire()
 				if err != nil {
 					nazalog.Error("gb28181 media server udp acquire failed:%s", err.Error())
 					return nil
 				}
+				mediaKey = fmt.Sprintf("%s%d", "tcp", port)
 			}
-			mediasvr = mediaserver.NewGB28181MediaServer(int(port), s, s.lalServer)
+			mediasvr = mediaserver.NewGB28181MediaServer(int(port), mediaKey, s, s.lalServer)
 			s.MediaServerMap.Store(fmt.Sprintf("%s%s", deviceId, channelId), mediasvr)
 		}
 		go mediasvr.Start(listener)
@@ -264,6 +268,9 @@ func (s *GB28181Server) CheckSsrc(ssrc uint32) (*mediaserver.MediaInfo, bool) {
 			}
 			return true
 		})
+		if isValidSsrc {
+			return false
+		}
 		return true
 	})
 
@@ -273,8 +280,36 @@ func (s *GB28181Server) CheckSsrc(ssrc uint32) (*mediaserver.MediaInfo, bool) {
 
 	return nil, false
 }
+func (s *GB28181Server) GetMediaInfoByKey(key string) (*mediaserver.MediaInfo, bool) {
+	var isValidMediaInfo bool
+	var mediaInfo *mediaserver.MediaInfo
+
+	Devices.Range(func(_, value any) bool {
+		d := value.(*Device)
+		d.channelMap.Range(func(_, value any) bool {
+			ch := value.(*Channel)
+			if ch.MediaInfo.MediaKey == key {
+				isValidMediaInfo = true
+				mediaInfo = &ch.MediaInfo
+				return false
+			}
+			return true
+		})
+		if isValidMediaInfo {
+			return false
+		}
+		return true
+	})
+
+	if isValidMediaInfo {
+		return mediaInfo, true
+	}
+
+	return nil, false
+}
 
 func (s *GB28181Server) NotifyClose(streamName string) {
+	var ok bool
 	Devices.Range(func(_, value any) bool {
 		d := value.(*Device)
 		d.channelMap.Range(func(key, value any) bool {
@@ -284,11 +319,14 @@ func (s *GB28181Server) NotifyClose(streamName string) {
 					ch.Bye(streamName)
 				}
 				ch.MediaInfo.Clear()
+				ok = true
 				return false
 			}
 			return true
 		})
-
+		if ok {
+			return false
+		}
 		return true
 	})
 }
