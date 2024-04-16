@@ -68,9 +68,9 @@ type GB28181Config struct {
 }
 
 type GB28181MediaConfig struct {
-	MediaIp       string `json:"mediaIp"`         // 流媒体IP,用于在SDP中指定
-	TCPListenPort uint16 `json:"tcp_listen_port"` // tcp监听端口
-	UDPListenPort uint16 `json:"udp_listen_port"` // udp监听端口
+	MediaIp               string `json:"mediaIp"`                  // 流媒体IP,用于在SDP中指定
+	ListenPort            uint16 `json:"listen_port"`              // tcp,udp监听端口 默认启动
+	MultiPortMaxIncrement uint16 `json:"multi_port_max_increment"` //多端口范围 ListenPort+1至ListenPort+MultiPortMax
 }
 
 type OnvifConfig struct {
