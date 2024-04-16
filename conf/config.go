@@ -33,11 +33,13 @@ type RtcConfig struct {
 }
 
 type HttpConfig struct {
-	ListenAddr      string `json:"http_listen_addr"`  // http服务监听地址
-	EnableHttps     bool   `json:"enable_https"`      // https使能标志
-	HttpsListenAddr string `json:"https_listen_addr"` // https监听地址
-	HttpsCertFile   string `json:"https_cert_file"`   // https cert 文件
-	HttpsKeyFile    string `json:"https_key_file"`    // https key 文件
+	ListenAddr      string   `json:"http_listen_addr"`  // http服务监听地址
+	EnableHttps     bool     `json:"enable_https"`      // https使能标志
+	HttpsListenAddr string   `json:"https_listen_addr"` // https监听地址
+	HttpsCertFile   string   `json:"https_cert_file"`   // https cert 文件
+	HttpsKeyFile    string   `json:"https_key_file"`    // https key 文件
+	Authentication  string   `json:"authentication"`    // 认证信息，零值时不生效
+	AcceptIDs       []string `json:"accept_ids"`        // 允许访问的远程 IP，零值时不生效
 }
 
 type HttpFmp4Config struct {

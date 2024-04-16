@@ -16,69 +16,50 @@ import (
 )
 
 func (s *LalMaxServer) InitRouter(router *gin.Engine) {
-	if router != nil {
-		router.Use(s.Cors())
-		// whip
-		router.POST("/whip", s.HandleWHIP)
-		router.OPTIONS("/whip", s.HandleWHIP)
-		router.DELETE("/whip", s.HandleWHIP)
-
-		// whep
-		router.POST("/whep", s.HandleWHEP)
-		router.OPTIONS("/whep", s.HandleWHEP)
-		router.DELETE("/whep", s.HandleWHEP)
-
-		// http-fmp4
-		router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
-
-		// hls-fmp4/llhls
-		router.GET("/live/hls/:streamid/:type", s.HandleHls)
-
-		// onvif
-		router.POST("/api/ctrl/onvif/pull", s.HandleOnvifPull)
-
-		// gb
-		gbLogic := gb28181.NewGbLogic(s.gbsbr)
-		router.GET("/api/gb/device_infos", gbLogic.GetDeviceInfos)
-		router.POST("/api/gb/start_play", gbLogic.StartPlay)
-		router.POST("/api/gb/stop_play", gbLogic.StopPlay)
-		router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
-		router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
-
-		// stat
-		router.GET("/api/stat/group", s.statGroupHandler)
-		router.GET("/api/stat/all_group", s.statAllGroupHandler)
-		router.GET("/api/stat/lal_info", s.statLalInfoHandler)
-
-		// ctrl
-		router.POST("/api/ctrl/start_relay_pull", s.ctrlStartRelayPullHandler)
-		router.POST("/api/ctrl/stop_relay_pull", s.ctrlStopRelayPullHandler)
-		router.POST("/api/ctrl/kick_session", s.ctrlKickSessionHandler)
-		router.POST("/api/ctrl/start_rtp_pub", s.ctrlStartRtpPubHandler)
+	if router == nil {
+		return
 	}
-}
-func (s *LalMaxServer) Cors() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		method := c.Request.Method
-		c.Header("Access-Control-Allow-Origin", "*")
-		//服务器支持的所有跨域请求的方法
-		c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE,UPDATE")
-		//允许跨域设置可以返回其他子段，可以自定义字段
-		c.Header("Access-Control-Allow-Headers", "*")
-		// 允许浏览器（客户端）可以解析的头部 （重要）
-		c.Header("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers")
-		//设置缓存时间
-		c.Header("Access-Control-Max-Age", "172800")
-		//允许客户端传递校验信息比如 cookie (重要)
-		c.Header("Access-Control-Allow-Credentials", "true")
+	router.Use(s.Cors())
+	// whip
+	router.POST("/whip", s.HandleWHIP)
+	router.OPTIONS("/whip", s.HandleWHIP)
+	router.DELETE("/whip", s.HandleWHIP)
 
-		//允许类型校验
-		if method == "OPTIONS" {
-			c.Status(http.StatusOK)
-		}
-		c.Next()
-	}
+	// whep
+	router.POST("/whep", s.HandleWHEP)
+	router.OPTIONS("/whep", s.HandleWHEP)
+	router.DELETE("/whep", s.HandleWHEP)
+
+	// http-fmp4
+	router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
+
+	// hls-fmp4/llhls
+	router.GET("/live/hls/:streamid/:type", s.HandleHls)
+
+	// onvif
+	router.POST("/api/ctrl/onvif/pull", s.HandleOnvifPull)
+
+	// gb
+	gbLogic := gb28181.NewGbLogic(s.gbsbr)
+	router.GET("/api/gb/device_infos", gbLogic.GetDeviceInfos)
+	router.POST("/api/gb/start_play", gbLogic.StartPlay)
+	router.POST("/api/gb/stop_play", gbLogic.StopPlay)
+	router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
+	router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
+
+	auth := Authentication(s.conf.HttpConfig.Authentication, s.conf.HttpConfig.AcceptIDs)
+	// stat
+	router.GET("/api/stat/group", auth, s.statGroupHandler)
+	router.GET("/api/stat/all_group", auth, s.statAllGroupHandler)
+	router.GET("/api/stat/lal_info", auth, s.statLalInfoHandler)
+
+	// ctrl
+	router.POST("/api/ctrl/start_relay_pull", auth, s.ctrlStartRelayPullHandler)
+	router.POST("/api/ctrl/stop_relay_pull", auth, s.ctrlStopRelayPullHandler)
+	router.POST("/api/ctrl/kick_session", auth, s.ctrlKickSessionHandler)
+	router.POST("/api/ctrl/start_rtp_pub", auth, s.ctrlStartRtpPubHandler)
 }
+
 func (s *LalMaxServer) HandleWHIP(c *gin.Context) {
 	switch c.Request.Method {
 	case "POST":
