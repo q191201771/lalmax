@@ -18,6 +18,7 @@ type Config struct {
 	ServerId         string           `json:"server_id"`       // http 通知唯一标识
 	HttpNotifyConfig HttpNotifyConfig `json:"http_notify"`     // http 通知配置
 	LalSvrConfigPath string           `json:"lal_config_path"` // lal配置目录
+	HookConfig       HookConfig       `json:"hook_config"`
 }
 
 type SrtConfig struct {
@@ -90,6 +91,11 @@ type HttpNotifyConfig struct {
 	OnRelayPullStop   string `json:"on_relay_pull_stop"`
 	OnRtmpConnect     string `json:"on_rtmp_connect"`
 	OnHlsMakeTs       string `json:"on_hls_make_ts"`
+}
+
+type HookConfig struct {
+	GopCacheNum          int `json:"gop_cache_num"`
+	SingleGopMaxFrameNum int `json:"single_gop_max_frame_num"`
 }
 
 func Open(filepath string) error {

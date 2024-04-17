@@ -87,7 +87,7 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 func (s *LalMaxServer) Run() (err error) {
 	s.lalsvr.WithOnHookSession(func(uniqueKey string, streamName string) logic.ICustomizeHookSessionContext {
 		// 有新的流了，创建业务层的对象，用于hook这个流
-		return hook.NewHookSession(uniqueKey, streamName, s.hlssvr)
+		return hook.NewHookSession(uniqueKey, streamName, s.hlssvr, s.conf.HookConfig.GopCacheNum, s.conf.HookConfig.SingleGopMaxFrameNum)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())

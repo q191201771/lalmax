@@ -65,7 +65,7 @@ func TestAllGroup(t *testing.T) {
 	})
 
 	t.Run("has consumer", func(t *testing.T) {
-		ss := hook.NewHookSession("test", "test", max.hlssvr)
+		ss := hook.NewHookSession("test", "test", max.hlssvr, 1, 0)
 		ss.AddConsumer("consumer1", nil)
 		hook.GetHookSessionManagerInstance().SetHookSession("test", ss)
 
@@ -98,7 +98,7 @@ func TestNotifyUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ss := hook.NewHookSession("test", "test", max.hlssvr)
+	ss := hook.NewHookSession("test", "test", max.hlssvr, 1, 0)
 	ss.AddConsumer("consumer1", nil)
 	hook.GetHookSessionManagerInstance().SetHookSession("test", ss)
 
