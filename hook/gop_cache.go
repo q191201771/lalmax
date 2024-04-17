@@ -17,6 +17,9 @@ type GopCache struct {
 
 // NewGopCache 创建 gop 缓存
 func NewGopCache(gopSize, singleGopMaxFrameNum int) *GopCache {
+	if gopSize < 0 {
+		gopSize = 0
+	}
 	num := gopSize + 1
 	return &GopCache{
 		data:                 make([]Gop, num),

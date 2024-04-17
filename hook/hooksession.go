@@ -21,9 +21,7 @@ type HookSession struct {
 	streamName string
 	consumers  sync.Map
 	hlssvr     *hls.HlsServer
-	// videoheader *base.RtmpMsg
-	// audioheader *base.RtmpMsg
-	gopCache *GopCache
+	gopCache   *GopCache
 }
 
 type consumerInfo struct {
@@ -95,20 +93,6 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 		session.hlssvr.OnMsg(session.streamName, msg)
 	}
 
-	// if msg.IsVideoKeySeqHeader() {
-	// 	session.cacheVideoHeaderMsg(&msg)
-	// }
-
-	// if msg.Header.MsgTypeId == base.RtmpTypeIdAudio {
-	// 	if msg.IsAacSeqHeader() {
-	// 		session.cacheAudioHeaderMsg(&msg)
-	// 	}
-
-	// 	if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
-	// 		session.cacheAudioHeaderMsg(&msg)
-	// 	}
-	// }
-
 	// TODO:做缓存处理/纯音频
 	session.consumers.Range(func(key, value interface{}) bool {
 		c := value.(*consumerInfo)
@@ -154,14 +138,6 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 
 	session.gopCache.Feed(msg)
 }
-
-// func (session *HookSession) cacheVideoHeaderMsg(msg *base.RtmpMsg) {
-// 	session.videoheader = msg
-// }
-
-// func (session *HookSession) cacheAudioHeaderMsg(msg *base.RtmpMsg) {
-// 	session.audioheader = msg
-// }
 
 func (session *HookSession) OnStop() {
 	if session.hlssvr != nil {
