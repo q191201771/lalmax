@@ -17,12 +17,11 @@ type IHookSessionSubscriber interface {
 }
 
 type HookSession struct {
-	uniqueKey   string
-	streamName  string
-	consumers   sync.Map
-	videoheader *base.RtmpMsg
-	audioheader *base.RtmpMsg
-	hlssvr      *hls.HlsServer
+	uniqueKey  string
+	streamName string
+	consumers  sync.Map
+	hlssvr     *hls.HlsServer
+	gopCache   *GopCache
 }
 
 type consumerInfo struct {
@@ -71,11 +70,12 @@ func (*consumerInfo) Url() string {
 	return ""
 }
 
-func NewHookSession(uniqueKey, streamName string, hlssvr *hls.HlsServer) *HookSession {
+func NewHookSession(uniqueKey, streamName string, hlssvr *hls.HlsServer, gopNum, singleGopMaxFrameNum int) *HookSession {
 	s := &HookSession{
 		uniqueKey:  uniqueKey,
 		streamName: streamName,
 		hlssvr:     hlssvr,
+		gopCache:   NewGopCache(gopNum, singleGopMaxFrameNum),
 	}
 
 	if s.hlssvr != nil {
@@ -93,23 +93,34 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 		session.hlssvr.OnMsg(session.streamName, msg)
 	}
 
-	if msg.IsVideoKeySeqHeader() {
-		session.cacheVideoHeaderMsg(&msg)
-	}
+	// if msg.IsVideoKeySeqHeader() {
+	// 	session.cacheVideoHeaderMsg(&msg)
+	// }
 
-	if msg.Header.MsgTypeId == base.RtmpTypeIdAudio {
-		if msg.IsAacSeqHeader() {
-			session.cacheAudioHeaderMsg(&msg)
-		}
+	// if msg.Header.MsgTypeId == base.RtmpTypeIdAudio {
+	// 	if msg.IsAacSeqHeader() {
+	// 		session.cacheAudioHeaderMsg(&msg)
+	// 	}
 
-		if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
-			session.cacheAudioHeaderMsg(&msg)
-		}
-	}
+	// 	if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
+	// 		session.cacheAudioHeaderMsg(&msg)
+	// 	}
+	// }
 
 	// TODO:做缓存处理/纯音频
 	session.consumers.Range(func(key, value interface{}) bool {
 		c := value.(*consumerInfo)
+
+		gopCount := session.gopCache.GetGopCount()
+		if !c.hasSendVideo && gopCount > 0 {
+			for i := 0; i < gopCount; i++ {
+				for _, item := range session.gopCache.GetGopDataAt(i) {
+					c.subscriber.OnMsg(item)
+				}
+			}
+			c.hasSendVideo = true
+		}
+
 		if msg.Header.MsgTypeId == base.RtmpTypeIdVideo {
 			if !c.hasSendVideo {
 				if msg.IsVideoKeyNalu() {
@@ -127,15 +138,17 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 		}
 		return true
 	})
+
+	session.gopCache.Feed(msg)
 }
 
-func (session *HookSession) cacheVideoHeaderMsg(msg *base.RtmpMsg) {
-	session.videoheader = msg
-}
+// func (session *HookSession) cacheVideoHeaderMsg(msg *base.RtmpMsg) {
+// 	session.videoheader = msg
+// }
 
-func (session *HookSession) cacheAudioHeaderMsg(msg *base.RtmpMsg) {
-	session.audioheader = msg
-}
+// func (session *HookSession) cacheAudioHeaderMsg(msg *base.RtmpMsg) {
+// 	session.audioheader = msg
+// }
 
 func (session *HookSession) OnStop() {
 	if session.hlssvr != nil {
@@ -189,9 +202,9 @@ func (session *HookSession) RemoveConsumer(consumerId string) {
 }
 
 func (session *HookSession) GetVideoSeqHeaderMsg() *base.RtmpMsg {
-	return session.videoheader
+	return session.gopCache.videoheader
 }
 
 func (session *HookSession) GetAudioSeqHeaderMsg() *base.RtmpMsg {
-	return session.audioheader
+	return session.gopCache.audioheader
 }
