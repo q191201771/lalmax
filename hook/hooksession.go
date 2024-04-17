@@ -21,7 +21,9 @@ type HookSession struct {
 	streamName string
 	consumers  sync.Map
 	hlssvr     *hls.HlsServer
-	gopCache   *GopCache
+	// videoheader *base.RtmpMsg
+	// audioheader *base.RtmpMsg
+	gopCache *GopCache
 }
 
 type consumerInfo struct {
@@ -113,6 +115,12 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 
 		gopCount := session.gopCache.GetGopCount()
 		if !c.hasSendVideo && gopCount > 0 {
+			if v := session.GetVideoSeqHeaderMsg(); v != nil {
+				c.subscriber.OnMsg(*v)
+			}
+			if v := session.GetAudioSeqHeaderMsg(); v != nil {
+				c.subscriber.OnMsg(*v)
+			}
 			for i := 0; i < gopCount; i++ {
 				for _, item := range session.gopCache.GetGopDataAt(i) {
 					c.subscriber.OnMsg(item)
@@ -123,11 +131,16 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 
 		if msg.Header.MsgTypeId == base.RtmpTypeIdVideo {
 			if !c.hasSendVideo {
-				if msg.IsVideoKeyNalu() {
-					c.hasSendVideo = true
-				} else {
+				if !msg.IsVideoKeyNalu() {
 					return true
 				}
+				if v := session.GetVideoSeqHeaderMsg(); v != nil {
+					c.subscriber.OnMsg(*v)
+				}
+				if v := session.GetAudioSeqHeaderMsg(); v != nil {
+					c.subscriber.OnMsg(*v)
+				}
+				c.hasSendVideo = true
 			}
 
 			c.subscriber.OnMsg(msg)

@@ -31,11 +31,12 @@ func (c *GopCache) Feed(msg base.RtmpMsg) {
 	case base.RtmpTypeIdMetadata:
 		return
 	case base.RtmpTypeIdAudio:
-		if codecID := msg.AudioCodecId(); msg.IsAacSeqHeader() ||
-			codecID == base.RtmpSoundFormatG711A ||
-			codecID == base.RtmpSoundFormatG711U {
+		if msg.IsAacSeqHeader() {
 			c.audioheader = &msg
 			return
+		}
+		if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
+			c.audioheader = &msg
 		}
 	case base.RtmpTypeIdVideo:
 		if msg.IsVideoKeySeqHeader() {
@@ -51,14 +52,13 @@ func (c *GopCache) Feed(msg base.RtmpMsg) {
 			c.feedLastGop(msg)
 		}
 	}
-	return
 }
 
 func (c *GopCache) feedNewGop(msg base.RtmpMsg) {
 	if c.isGopRingFull() {
 		c.first = (c.first + 1) % c.gopSize
 	}
-	c.data[c.last].Clear()
+	c.data[c.last].clear()
 	c.data[c.last].feed(msg)
 	c.last = (c.last + 1) % c.gopSize
 }
@@ -68,7 +68,7 @@ func (c *GopCache) feedLastGop(msg base.RtmpMsg) {
 		return
 	}
 	idx := (c.last - 1 + c.gopSize) % c.gopSize
-	if c.singleGopMaxFrameNum == 0 || c.data[idx].len() <= c.singleGopMaxFrameNum {
+	if c.singleGopMaxFrameNum == 0 || c.data[idx].size() <= c.singleGopMaxFrameNum {
 		c.data[idx].feed(msg)
 	}
 }
@@ -81,8 +81,8 @@ func (c *GopCache) isGopRingEmpty() bool {
 }
 
 func (c *GopCache) Clear() {
-	c.audioheader = nil
-	c.videoheader = nil
+	// c.audioheader = nil
+	// c.videoheader = nil
 	c.last = 0
 	c.first = 0
 }
@@ -106,12 +106,12 @@ func (g *Gop) feed(msg base.RtmpMsg) {
 	g.data = append(g.data, msg)
 }
 
-func (g *Gop) Clear() {
+func (g *Gop) clear() {
 	if len(g.data) == 0 {
 		return
 	}
 	g.data = g.data[:0]
 }
-func (g *Gop) len() int {
+func (g *Gop) size() int {
 	return len(g.data)
 }
