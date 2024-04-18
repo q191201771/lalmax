@@ -31,13 +31,13 @@ func (s *LalMaxServer) Cors() gin.HandlerFunc {
 }
 
 // Authentication 接口鉴权
-func Authentication(token string, acceptIPs []string) gin.HandlerFunc {
+func Authentication(secrets, ips []string) gin.HandlerFunc {
 	out := base.ApiRespBasic{
 		ErrorCode: http.StatusUnauthorized,
 		Desp:      http.StatusText(http.StatusUnauthorized),
 	}
 	return func(c *gin.Context) {
-		if !authentication(c.Query("token"), token, c.ClientIP(), acceptIPs) {
+		if !authentication(c.Query("token"), c.ClientIP(), secrets, ips) {
 			c.JSON(200, out)
 			return
 		}
@@ -46,13 +46,13 @@ func Authentication(token string, acceptIPs []string) gin.HandlerFunc {
 }
 
 // authentication 判断是否符合要求，返回 false 表示鉴权失败
-func authentication(reqToken, svcToken, clientIP string, acceptIPs []string) bool {
-	// token 鉴权失败
-	if svcToken != "" && reqToken != svcToken {
+func authentication(reqToken, clientIP string, secrets, ips []string) bool {
+	// 秘钥过滤
+	if len(secrets) > 0 && !containFn(secrets, reqToken) {
 		return false
 	}
 	// ip 白名单过滤
-	if len(acceptIPs) > 0 && !containFn(acceptIPs, clientIP) {
+	if len(ips) > 0 && !containFn(ips, clientIP) {
 		return false
 	}
 	return true

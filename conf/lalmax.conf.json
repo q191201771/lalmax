@@ -15,8 +15,10 @@
     "https_listen_addr": ":1233",
     "https_cert_file": "./conf/cert.pem",
     "https_key_file": "./conf/key.pem",
-    "authentication": "",
-    "accept_ids": []
+    "ctrl_auth_whitelist": {
+      "ips": [],
+      "secrets": []
+    }
   },
   "httpfmp4_config": {
     "enable": true

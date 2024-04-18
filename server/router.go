@@ -47,7 +47,7 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 	router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
 	router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
 
-	auth := Authentication(s.conf.HttpConfig.Authentication, s.conf.HttpConfig.AcceptIDs)
+	auth := Authentication(s.conf.HttpConfig.CtrlAuthWhitelist.Secrets, s.conf.HttpConfig.CtrlAuthWhitelist.IPs)
 	// stat
 	router.GET("/api/stat/group", auth, s.statGroupHandler)
 	router.GET("/api/stat/all_group", auth, s.statAllGroupHandler)

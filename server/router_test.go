@@ -124,32 +124,32 @@ func TestNotifyUpdate(t *testing.T) {
 
 func TestAuthentication(t *testing.T) {
 	t.Run("无须鉴权", func(t *testing.T) {
-		if !authentication("12", "", "192.168.0.2", nil) {
+		if !authentication("12", "192.168.0.2", nil, nil) {
 			t.Fatal("期望通过， 但实际未通过")
 		}
 	})
 	t.Run("Token 鉴权失败", func(t *testing.T) {
-		if authentication("1", "12", "192.168.0.2", nil) {
+		if authentication("1", "192.168.0.2", []string{"12"}, nil) {
 			t.Fatal("期望不通过， 但实际通过")
 		}
 	})
 	t.Run("token 鉴权成功", func(t *testing.T) {
-		if !authentication("12", "12", "192.168.0.2", nil) {
+		if !authentication("12", "192.168.0.2", []string{"12"}, nil) {
 			t.Fatal("期望通过， 但实际不通过")
 		}
 	})
 	t.Run("ip 白名单鉴权失败", func(t *testing.T) {
-		if authentication("12", "", "192.168.0.2", []string{"192.168.1.2"}) {
+		if authentication("12", "192.168.0.2", nil, []string{"192.168.1.2"}) {
 			t.Fatal("期望不通过， 但实际通过")
 		}
 	})
 	t.Run("ip 白名单鉴权成功", func(t *testing.T) {
-		if !authentication("12", "12", "192.168.0.2", []string{"192.168.0.2"}) {
+		if !authentication("12", "192.168.0.2", []string{"12"}, []string{"192.168.0.2"}) {
 			t.Fatal("期望通过， 但实际不通过")
 		}
 	})
 	t.Run("两种模式结合鉴权通过", func(t *testing.T) {
-		if !authentication("12", "12", "192.168.0.2", []string{"192.168.0.2"}) {
+		if !authentication("12", "192.168.0.2", []string{"12"}, []string{"192.168.0.2"}) {
 			t.Fatal("期望通过， 但实际不通过")
 		}
 	})

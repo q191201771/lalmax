@@ -70,18 +70,21 @@
 
 *值举例*: "./conf/key.pem"
 
-- authentication: 鉴权的秘钥，用于访问以 `/api/stat` 和 `/api/ctrl` 前缀的接口，空串表示不鉴权，无权限访问时 http status 将会响应 200，其 error_code 为 401，用户请求鉴权的方式是增加 query 参数 `token`，例如 `token=secret`
+- ctrl_auth_whitelist: 统计控制类接口鉴权，用于访问以 `/api/stat` 和 `/api/ctrl` 前缀的接口，无权限访问时 http status 将会响应 200，其 error_code 为 401。多种鉴权方式都不是零值时，必须同时满足才会通过鉴权。
 
-*类型*: string
+*类型*: object
 
-*值举例*: "7E3F6994-F073-4EE1-9F93-29BF42D5971D"
+- secrets: 用户请求鉴权的方式是增加 query 参数 `token`，例如 `token=secret`，满足数组中任意匹配则通过。
 
-- accept_ids: 远程 IP 白名单，用于访问以 `/api/stat` 和 `/api/ctrl` 前缀的接口，空数组表示允许任意 IP 访问，无权限访问时 http status 将会响应 200，其 error_code 为 401。注意，两种鉴权方式都不是零值时，必须同时满足才会通过鉴权。
+*类型*: []string
+
+*值举例*: ["EC3D1536-5D93-4BD6-9FBD-96A52CB1596D"]
+
+- ips: 远程 IP 白名单，空数组表示允许任意 IP 访问，无权限访问时 http status 将会响应 200，其 error_code 为 401。
 
 *类型*: []string
 
 *值举例*: ["192.168.1.2","192.168.1.3"]
-
 
 
 # http-fmp4配置
