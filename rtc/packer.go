@@ -18,6 +18,7 @@ const (
 	PacketSafariHevc = "SafariHevc"
 	PacketPCMA       = "PCMA"
 	PacketPCMU       = "PCMU"
+	PacketOPUS       = "OPUS"
 )
 
 type Packer struct {
@@ -36,6 +37,8 @@ func NewPacker(mimeType string, codec []byte) *Packer {
 		p.enc = NewG711RtpEncoder(0)
 	case PacketSafariHevc:
 		p.enc = NewSafariHEVCRtpEncoder(codec)
+	case PacketOPUS:
+		p.enc = NewOpusRtpEncoder(111)
 	}
 	return p
 }
@@ -294,4 +297,43 @@ func (enc *SafariHEVCRtpEncoder) doPacketNaluForSafariHevc(nalu []byte, keyFrame
 	}
 
 	return rtpPayloads
+}
+
+type OpusRtpEncoder struct {
+	IRtpEncoder
+	rtpPacker *rtprtcp.RtpPacker
+}
+
+func NewOpusRtpEncoder(pt uint8) *OpusRtpEncoder {
+	pp := rtprtcp.NewRtpPackerPayloadOpus()
+
+	return &OpusRtpEncoder{
+		rtpPacker: rtprtcp.NewRtpPacker(pp, 48000, 0),
+	}
+}
+
+func (enc *OpusRtpEncoder) Encode(msg base.RtmpMsg) ([]*rtp.Packet, error) {
+	avpacket := base.AvPacket{
+		Timestamp: int64(msg.Dts()),
+		Payload:   msg.Payload[1:],
+	}
+
+	var pkts []*rtp.Packet
+	rtpPkts := enc.rtpPacker.Pack(avpacket)
+	for _, pkt := range rtpPkts {
+		var newRtpPkt rtp.Packet
+		err := newRtpPkt.Unmarshal(pkt.Raw)
+		if err != nil {
+			nazalog.Error(err)
+			continue
+		}
+
+		pkts = append(pkts, &newRtpPkt)
+	}
+
+	if len(pkts) == 0 {
+		return nil, fmt.Errorf("Packetize failed")
+	}
+
+	return pkts, nil
 }
