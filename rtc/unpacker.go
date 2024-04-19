@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aler9/gortsplib/v2/pkg/rtpreorderer"
-	"github.com/bluenviron/gortsplib/v3/pkg/formats"
-	"github.com/bluenviron/gortsplib/v3/pkg/formats/rtph264"
-	"github.com/bluenviron/gortsplib/v3/pkg/formats/rtpsimpleaudio"
+	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtph264"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtplpcm"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpsimpleaudio"
+	"github.com/bluenviron/gortsplib/v4/pkg/rtpreorderer"
+	"github.com/bluenviron/gortsplib/v4/pkg/rtptime"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"github.com/q191201771/lal/pkg/avc"
@@ -22,31 +24,37 @@ type UnPacker struct {
 	reorderer   *rtpreorderer.Reorderer
 	payloadType base.AvPacketPt
 	clockRate   uint32
-	dec         IRtpDecoder
 	pktChan     chan<- base.AvPacket
+	timeDecoder *rtptime.GlobalDecoder
+	format      format.Format
+	dec         IRtpDecoder
 }
 
 func NewUnPacker(mimeType string, clockRate uint32, pktChan chan<- base.AvPacket) *UnPacker {
 	un := &UnPacker{
-		reorderer: rtpreorderer.New(),
-		clockRate: clockRate,
-		pktChan:   pktChan,
+		reorderer:   rtpreorderer.New(),
+		clockRate:   clockRate,
+		pktChan:     pktChan,
+		timeDecoder: rtptime.NewGlobalDecoder(),
 	}
 
-	// TODO 支持opus
 	switch mimeType {
 	case webrtc.MimeTypeH264:
 		un.payloadType = base.AvPacketPtAvc
-		un.dec = NewH264RtpDecoder()
+		un.format = &format.H264{}
+		un.dec = NewH264RtpDecoder(un.format)
 	case webrtc.MimeTypePCMA:
 		un.payloadType = base.AvPacketPtG711A
-		un.dec = NewG711RtpDecoder()
+		un.format = &format.G711{}
 	case webrtc.MimeTypePCMU:
 		un.payloadType = base.AvPacketPtG711U
-		un.dec = NewG711RtpDecoder()
+		un.format = &format.G711{}
+	case webrtc.MimeTypeOpus:
+		un.payloadType = base.AvPacketPtOpus
+		un.format = &format.Opus{}
+		un.dec = NewOpusRtpDecoder(un.format)
 	default:
-		nazalog.Errorf("invalid mimeType:%s", mimeType)
-		return nil
+		nazalog.Error("unsupport mineType:", mimeType)
 	}
 
 	return un
@@ -60,10 +68,15 @@ func (un *UnPacker) UnPack(pkt *rtp.Packet) (err error) {
 	}
 
 	for _, rtppkt := range packets {
-		frame, pts, err := un.dec.Decode(rtppkt)
+		pts, ok := un.timeDecoder.Decode(un.format, rtppkt)
+		if !ok {
+			continue
+		}
+
+		frame, err := un.dec.Decode(rtppkt)
 		if err != nil {
 			if err != ErrNeedMoreFrames {
-				nazalog.Error(err)
+				nazalog.Error("rtp dec Decode failed:", err)
 				return err
 			}
 
@@ -83,7 +96,7 @@ func (un *UnPacker) UnPack(pkt *rtp.Packet) (err error) {
 }
 
 type IRtpDecoder interface {
-	Decode(pkt *rtp.Packet) ([]byte, time.Duration, error)
+	Decode(pkt *rtp.Packet) ([]byte, error)
 }
 
 type H264RtpDecoder struct {
@@ -91,27 +104,22 @@ type H264RtpDecoder struct {
 	dec *rtph264.Decoder
 }
 
-func NewH264RtpDecoder() *H264RtpDecoder {
-	var forma formats.H264
-	dec, err := forma.CreateDecoder2()
-	if err != nil {
-		nazalog.Error(err)
-		return nil
-	}
-
+func NewH264RtpDecoder(f format.Format) *H264RtpDecoder {
+	dec, _ := f.(*format.H264).CreateDecoder()
 	return &H264RtpDecoder{
 		dec: dec,
 	}
 }
 
-func (r *H264RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, time.Duration, error) {
-	nalus, pts, err := r.dec.DecodeUntilMarker(pkt)
+func (r *H264RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, error) {
+	nalus, err := r.dec.Decode(pkt)
 	if err != nil {
-		if err == rtph264.ErrNonStartingPacketAndNoPrevious || err == rtph264.ErrMorePacketsNeeded {
-			err = ErrNeedMoreFrames
-		}
+		return nil, ErrNeedMoreFrames
+	}
 
-		return nil, 0, err
+	if len(nalus) == 0 {
+		err = fmt.Errorf("invalid frame")
+		return nil, err
 	}
 
 	var frame []byte
@@ -120,38 +128,49 @@ func (r *H264RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, time.Duration, error) 
 		frame = append(frame, nalu...)
 	}
 
-	if len(frame) == 0 {
-		err = fmt.Errorf("invalid frame")
-		return nil, 0, err
-	}
-
-	return frame, pts, nil
+	return frame, nil
 }
 
 type G711RtpDecoder struct {
 	IRtpDecoder
-	dec *rtpsimpleaudio.Decoder
+	dec *rtplpcm.Decoder
 }
 
-func NewG711RtpDecoder() *G711RtpDecoder {
-	var forma formats.G711
-	dec, err := forma.CreateDecoder2()
-	if err != nil {
-		nazalog.Error(err)
-		return nil
-	}
-
+func NewG711RtpDecoder(f format.Format) *G711RtpDecoder {
+	dec, _ := f.(*format.G711).CreateDecoder()
 	return &G711RtpDecoder{
 		dec: dec,
 	}
 }
 
-func (r *G711RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, time.Duration, error) {
-	frame, pts, err := r.dec.Decode(pkt)
+func (r *G711RtpDecoder) Decode(pkt *rtp.Packet) ([]byte, error) {
+	frame, err := r.dec.Decode(pkt)
 	if err != nil {
 		nazalog.Error(err)
-		return nil, 0, err
+		return nil, err
 	}
 
-	return frame, pts, nil
+	return frame, nil
+}
+
+type OpusRtpDecoder struct {
+	IRtpDecoder
+	dec *rtpsimpleaudio.Decoder
+}
+
+func NewOpusRtpDecoder(f format.Format) *OpusRtpDecoder {
+	dec, _ := f.(*format.Opus).CreateDecoder()
+	return &OpusRtpDecoder{
+		dec: dec,
+	}
+}
+
+func (r *OpusRtpDecoder) Decode(pkt *rtp.Packet) ([]byte, error) {
+	frame, err := r.dec.Decode(pkt)
+	if err != nil {
+		nazalog.Error(err)
+		return nil, err
+	}
+
+	return frame, nil
 }

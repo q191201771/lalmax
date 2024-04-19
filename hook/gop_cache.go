@@ -38,7 +38,7 @@ func (c *GopCache) Feed(msg base.RtmpMsg) {
 			c.audioheader = &msg
 			return
 		}
-		if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U {
+		if msg.AudioCodecId() == base.RtmpSoundFormatG711A || msg.AudioCodecId() == base.RtmpSoundFormatG711U || msg.AudioCodecId() == base.RtmpSoundFormatOpus {
 			c.audioheader = &msg
 		}
 	case base.RtmpTypeIdVideo:

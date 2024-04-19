@@ -106,6 +106,14 @@ func (conn *whepSession) GetAnswerSDP(offer string) (sdp string) {
 			}
 
 			mimeType = PacketPCMU
+		case base.RtmpSoundFormatOpus:
+			conn.audioTrack, err = webrtc.NewTrackLocalStaticRTP(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "lalmax")
+			if err != nil {
+				nazalog.Error(err)
+				return
+			}
+
+			mimeType = PacketOPUS
 		default:
 			nazalog.Error("unsupport audio codeid:", audioId)
 		}

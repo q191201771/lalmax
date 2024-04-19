@@ -112,7 +112,7 @@ func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 				pts := time.Millisecond*time.Duration(msg.Pts()) - session.startVideoPts
 				err = session.muxer.WriteH26x(time.Now(), pts, nalus)
 				if err != nil {
-					nazalog.Error(err)
+					nazalog.Error("hls-fmp4 WriteH26x failed, err:", err)
 				}
 			}
 
@@ -121,7 +121,13 @@ func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 				pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
 				err := session.muxer.WriteMPEG4Audio(time.Now(), pts, [][]byte{msg.Payload[2:]})
 				if err != nil {
-					nazalog.Error(err)
+					nazalog.Error("hls-fmp4 WriteMPEG4Audio failed, err:", err)
+				}
+			} else if session.audioCodecId == int(base.RtmpSoundFormatOpus) {
+				pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
+				err := session.muxer.WriteOpus(time.Now(), pts, [][]byte{msg.Payload[1:]})
+				if err != nil {
+					nazalog.Error("hls-fmp4 WriteOpus failed, err:", err)
 				}
 			}
 		}
@@ -151,6 +157,20 @@ func (session *HlsSession) OnMsg(msg base.RtmpMsg) {
 				}
 				session.data = append(session.data, frame)
 			}
+		} else if session.audioCodecId == int(base.RtmpSoundFormatOpus) {
+			if !session.audioStartPTSFilled {
+				session.startAudioPts = time.Millisecond * time.Duration(msg.Dts())
+				session.audioStartPTSFilled = true
+			}
+
+			pts := time.Millisecond*time.Duration(msg.Dts()) - session.startAudioPts
+			frame := Frame{
+				ntp:       time.Now(),
+				pts:       pts,
+				au:        [][]byte{msg.Payload[1:]},
+				codecType: msg.AudioCodecId(),
+			}
+			session.data = append(session.data, frame)
 		} else {
 			return
 		}
@@ -249,6 +269,12 @@ func (session *HlsSession) drain() {
 					Config: mpegConf,
 				},
 			}
+		} else if session.audioCodecId == int(base.RtmpSoundFormatOpus) {
+			session.muxer.AudioTrack = &gohlslib.Track{
+				Codec: &codecs.Opus{
+					ChannelCount: 1,
+				},
+			}
 		}
 	}
 
@@ -261,13 +287,19 @@ func (session *HlsSession) drain() {
 		if data.codecType == base.RtmpCodecIdAvc || data.codecType == base.RtmpCodecIdHevc {
 			err := session.muxer.WriteH26x(data.ntp, data.pts, data.au)
 			if err != nil {
-				nazalog.Error(err)
+				nazalog.Error("hls-fmp4 WriteH26x failed, err:", err)
 				continue
 			}
 		} else if data.codecType == base.RtmpSoundFormatAac {
 			err := session.muxer.WriteMPEG4Audio(data.ntp, data.pts, data.au)
 			if err != nil {
-				nazalog.Error(err)
+				nazalog.Error("hls-fmp4 WriteMPEG4Audio failed, err:", err)
+				continue
+			}
+		} else if data.codecType == base.RtmpSoundFormatOpus {
+			err := session.muxer.WriteOpus(data.ntp, data.pts, data.au)
+			if err != nil {
+				nazalog.Error("hls-fmp4 WriteMPEG4Audio failed, err:", err)
 				continue
 			}
 		} else {
