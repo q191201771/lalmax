@@ -26,6 +26,10 @@
   "hls_config": {
     "enable": true
   },
+  "hook_config": {
+    "gop_cache_num": 1,
+    "single_gop_max_frame_num": 0
+  },
   "gb28181_config": {
     "enable": true,
     "serial": "34020000002000000001",

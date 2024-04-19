@@ -127,6 +127,22 @@
 
 *值举例*: true
 
+# hook_config
+主要用于 hook 相关的配置。
+
+- gop_cache_num: gop 缓存的数量，默认为 1
+
+*类型*: int
+
+*值举例*: 3
+
+- single_gop_max_frame_num: 一个 gop 的缓存帧数，0 表示智能识别
+
+*类型*: int
+
+*值举例*: 120
+
+
 # gb28181_config
 
 - enable: gb28181使能配置
