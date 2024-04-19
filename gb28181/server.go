@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	udpTransport "github.com/pion/transport/v3/udp"
 	"io/ioutil"
 	config "lalmax/conf"
 	"lalmax/gb28181/mediaserver"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/ghettovoice/gosip"
@@ -22,13 +25,24 @@ import (
 	"golang.org/x/text/transform"
 )
 
+type IMediaOpObserver interface {
+	OnStartMediaServer(netWork string, singlePort bool, deviceId string, channelId string) *mediaserver.GB28181MediaServer
+	OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string) error
+}
 type GB28181Server struct {
 	conf              config.GB28181Config
 	RegisterValidity  time.Duration // 注册有效期，单位秒，默认 3600
 	HeartbeatInterval time.Duration // 心跳间隔，单位秒，默认 60
 	RemoveBanInterval time.Duration // 移除禁止设备间隔,默认600s
 	keepaliveInterval int
-	lalServer         logic.ILalServer
+
+	lalServer logic.ILalServer
+
+	udpAvailConnPool *AvailConnPool
+	tcpAvailConnPool *AvailConnPool
+
+	MediaServerMap sync.Map
+	disposeOnce    sync.Once
 }
 
 const MaxRegisterCount = 3
@@ -69,22 +83,36 @@ func NewGB28181Server(conf config.GB28181Config, lal logic.ILalServer) *GB28181S
 		conf.MediaConfig.MediaIp = "0.0.0.0"
 	}
 
-	if conf.MediaConfig.TCPListenPort == 0 {
-		conf.MediaConfig.TCPListenPort = 30000
+	if conf.MediaConfig.ListenPort == 0 {
+		conf.MediaConfig.ListenPort = 30000
 	}
-
-	if conf.MediaConfig.UDPListenPort == 0 {
-		conf.MediaConfig.UDPListenPort = 30000
+	if conf.MediaConfig.MultiPortMaxIncrement == 0 {
+		conf.MediaConfig.MultiPortMaxIncrement = 3000
 	}
-
-	return &GB28181Server{
+	gb28181Server := &GB28181Server{
 		conf:              conf,
 		RegisterValidity:  3600 * time.Second,
 		HeartbeatInterval: 60 * time.Second,
 		RemoveBanInterval: 600 * time.Second,
 		keepaliveInterval: conf.KeepaliveInterval,
 		lalServer:         lal,
+		udpAvailConnPool:  NewAvailConnPool(conf.MediaConfig.ListenPort+1, conf.MediaConfig.ListenPort+conf.MediaConfig.MultiPortMaxIncrement),
+		tcpAvailConnPool:  NewAvailConnPool(conf.MediaConfig.ListenPort+1, conf.MediaConfig.ListenPort+conf.MediaConfig.MultiPortMaxIncrement),
 	}
+	gb28181Server.tcpAvailConnPool.onListenWithPort = func(port uint16) (net.Listener, error) {
+		return net.Listen("tcp", fmt.Sprintf(":%d", port))
+	}
+
+	gb28181Server.udpAvailConnPool.onListenWithPort = func(port uint16) (net.Listener, error) {
+		addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
+		if err != nil {
+			nazalog.Error("gb28181 media server udp listen failed,err:", err)
+			return nil, err
+		}
+
+		return udpTransport.Listen("udp", addr)
+	}
+	return gb28181Server
 }
 
 func (s *GB28181Server) Start() {
@@ -93,12 +121,6 @@ func (s *GB28181Server) Start() {
 	if s.conf.SipIP != "" {
 		srvConf.Host = s.conf.SipIP
 	}
-
-	mediasvr := mediaserver.NewGB28181MediaServer(fmt.Sprintf(":%d", s.conf.MediaConfig.TCPListenPort), fmt.Sprintf(":%d", s.conf.MediaConfig.UDPListenPort), s.lalServer)
-	mediasvr.CheckSsrcFunc = s.CheckSsrc
-	mediasvr.NotifyCloseFunc = s.NotifyClose
-	go mediasvr.Start()
-
 	sipsvr = gosip.NewServer(srvConf, nil, nil, logger)
 	sipsvr.OnRequest(sip.REGISTER, s.OnRegister)
 	sipsvr.OnRequest(sip.MESSAGE, s.OnMessage)
@@ -115,49 +137,196 @@ func (s *GB28181Server) Start() {
 
 	go s.startJob()
 }
+func (s *GB28181Server) Dispose() {
+	s.disposeOnce.Do(
+		func() {
+			s.MediaServerMap.Range(func(_, value any) bool {
+				mediaServer := value.(*mediaserver.GB28181MediaServer)
+				mediaServer.Dispose()
+				return true
+			})
+		})
+}
+func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, deviceId string, channelId string) *mediaserver.GB28181MediaServer {
+	isTcpFlag := false
+	if netWork == "tcp" {
+		isTcpFlag = true
+	}
+	var mediasvr *mediaserver.GB28181MediaServer
+	if singlePort {
+		if isTcpFlag {
+			value, ok := s.MediaServerMap.Load(fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort))
+			if ok {
+				mediasvr = value.(*mediaserver.GB28181MediaServer)
+			}
+		} else {
+			value, ok := s.MediaServerMap.Load(fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort))
+			if ok {
+				mediasvr = value.(*mediaserver.GB28181MediaServer)
+			}
+		}
+	} else {
+		value, ok := s.MediaServerMap.Load(fmt.Sprintf("%s%s", deviceId, channelId))
+		if ok {
+			mediasvr = value.(*mediaserver.GB28181MediaServer)
+		}
+	}
+	var listener net.Listener
+	var err error
+	var port uint16
+	if mediasvr == nil {
+		if singlePort {
+			if isTcpFlag {
+				mediasvr = mediaserver.NewGB28181MediaServer(int(s.conf.MediaConfig.ListenPort), fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort), s, s.lalServer)
+				listener, err = s.tcpAvailConnPool.ListenWithPort(s.conf.MediaConfig.ListenPort)
+				if err != nil {
+					nazalog.Error("gb28181 media server tcp Listen failed:%s", err.Error())
+					return nil
+				}
+				s.MediaServerMap.Store(fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort), mediasvr)
+			} else {
+				mediasvr = mediaserver.NewGB28181MediaServer(int(s.conf.MediaConfig.ListenPort), fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort), s, s.lalServer)
+				listener, err = s.udpAvailConnPool.ListenWithPort(s.conf.MediaConfig.ListenPort)
+				if err != nil {
+					nazalog.Error("gb28181 media server udp Listen failed:%s", err.Error())
+					return nil
+				}
+				s.MediaServerMap.Store(fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort), mediasvr)
+			}
+		} else {
+			mediaKey := ""
+			if isTcpFlag {
+				listener, port, err = s.tcpAvailConnPool.Acquire()
+				if err != nil {
+					nazalog.Error("gb28181 media server tcp acquire failed:%s", err.Error())
+					return nil
+				}
+				mediaKey = fmt.Sprintf("%s%d", "tcp", port)
+			} else {
+				listener, port, err = s.udpAvailConnPool.Acquire()
+				if err != nil {
+					nazalog.Error("gb28181 media server udp acquire failed:%s", err.Error())
+					return nil
+				}
+				mediaKey = fmt.Sprintf("%s%d", "tcp", port)
+			}
+			mediasvr = mediaserver.NewGB28181MediaServer(int(port), mediaKey, s, s.lalServer)
+			s.MediaServerMap.Store(fmt.Sprintf("%s%s", deviceId, channelId), mediasvr)
+		}
+		go mediasvr.Start(listener)
+	}
+	return mediasvr
+}
+func (s *GB28181Server) OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string) error {
+	isTcpFlag := false
+	if netWork == "tcp" {
+		isTcpFlag = true
+	}
+	var mediasvr *mediaserver.GB28181MediaServer
+	if singlePort {
+		if isTcpFlag {
+			key := fmt.Sprintf("%s%d", "tcp", s.conf.MediaConfig.ListenPort)
+			value, ok := s.MediaServerMap.Load(key)
+			if ok {
+				mediasvr = value.(*mediaserver.GB28181MediaServer)
+				s.MediaServerMap.Delete(key)
+			}
+		} else {
+			key := fmt.Sprintf("%s%d", "udp", s.conf.MediaConfig.ListenPort)
+			value, ok := s.MediaServerMap.Load(key)
+			if ok {
+				mediasvr = value.(*mediaserver.GB28181MediaServer)
+				s.MediaServerMap.Delete(key)
+			}
+		}
+	} else {
+		key := fmt.Sprintf("%s%s", deviceId, channelId)
+		value, ok := s.MediaServerMap.Load(key)
+		if ok {
+			mediasvr = value.(*mediaserver.GB28181MediaServer)
+			s.MediaServerMap.Delete(key)
+		}
+	}
+	if mediasvr != nil {
+		mediasvr.Dispose()
 
-func (s *GB28181Server) CheckSsrc(ssrc uint32) (string, bool) {
+	}
+	return nil
+}
+func (s *GB28181Server) CheckSsrc(ssrc uint32) (*mediaserver.MediaInfo, bool) {
 	var isValidSsrc bool
-	var streamName string
+	var mediaInfo *mediaserver.MediaInfo
 
 	Devices.Range(func(_, value any) bool {
 		d := value.(*Device)
 		d.channelMap.Range(func(key, value any) bool {
 			ch := value.(*Channel)
-			if ch.mediaInfo.Ssrc == ssrc {
+			if ch.MediaInfo.Ssrc == ssrc {
 				isValidSsrc = true
-				streamName = ch.mediaInfo.StreamName
+				mediaInfo = &ch.MediaInfo
 				return false
 			}
 			return true
 		})
+		if isValidSsrc {
+			return false
+		}
 		return true
 	})
 
 	if isValidSsrc {
-		return streamName, true
+		return mediaInfo, true
 	}
 
-	return "", false
+	return nil, false
 }
+func (s *GB28181Server) GetMediaInfoByKey(key string) (*mediaserver.MediaInfo, bool) {
+	var isValidMediaInfo bool
+	var mediaInfo *mediaserver.MediaInfo
 
-func (s *GB28181Server) NotifyClose(streamName string) {
 	Devices.Range(func(_, value any) bool {
 		d := value.(*Device)
-		d.channelMap.Range(func(key, value any) bool {
+		d.channelMap.Range(func(_, value any) bool {
 			ch := value.(*Channel)
-			if ch.mediaInfo.StreamName == streamName {
-				if ch.mediaInfo.IsInvite {
-					ch.Bye(streamName)
-				}
-				ch.mediaInfo.IsInvite = false
-				ch.mediaInfo.Ssrc = 0
-				ch.mediaInfo.StreamName = ""
+			if ch.MediaInfo.MediaKey == key {
+				isValidMediaInfo = true
+				mediaInfo = &ch.MediaInfo
 				return false
 			}
 			return true
 		})
+		if isValidMediaInfo {
+			return false
+		}
+		return true
+	})
 
+	if isValidMediaInfo {
+		return mediaInfo, true
+	}
+
+	return nil, false
+}
+
+func (s *GB28181Server) NotifyClose(streamName string) {
+	var ok bool
+	Devices.Range(func(_, value any) bool {
+		d := value.(*Device)
+		d.channelMap.Range(func(key, value any) bool {
+			ch := value.(*Channel)
+			if ch.MediaInfo.StreamName == streamName {
+				if ch.MediaInfo.IsInvite {
+					ch.Bye(streamName)
+				}
+				ch.MediaInfo.Clear()
+				ok = true
+				return false
+			}
+			return true
+		})
+		if ok {
+			return false
+		}
 		return true
 	})
 }
@@ -517,6 +686,23 @@ func (s *GB28181Server) OnNotify(req sip.Request, tx sip.ServerTransaction) {
 }
 
 func (s *GB28181Server) OnBye(req sip.Request, tx sip.ServerTransaction) {
+	callIdStr := ""
+	if callId, ok := req.CallID(); ok {
+		callIdStr = callId.Value()
+	}
+	from, _ := req.From()
+	devId := from.Address.User().String()
+	if _d, ok := Devices.Load(devId); ok {
+		d := _d.(*Device)
+		d.channelMap.Range(func(key, value any) bool {
+			ch := value.(*Channel)
+			if ch.GetCallId() == callIdStr {
+				ch.byeClear()
+				return false
+			}
+			return true
+		})
+	}
 	tx.Respond(sip.NewResponseFromRequest("", req, http.StatusOK, "OK", ""))
 }
 
@@ -548,6 +734,7 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 			mediaIP:      mediaIp,
 			NetAddr:      deviceIp,
 		}
+		d.WithMediaServer(s)
 		nazalog.Info("StoreDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
 		Devices.Store(id, d)
 	}

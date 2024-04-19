@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	config "lalmax/conf"
+	"lalmax/gb28181/mediaserver"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,6 +20,10 @@ type Channel struct {
 	GpsTime time.Time // gps时间
 	number  uint16
 	ackReq  sip.Request
+
+	observer IMediaOpObserver
+	playInfo *PlayInfo
+
 	ChannelInfo
 }
 
@@ -42,11 +47,7 @@ type ChannelInfo struct {
 	Latitude     string        `xml:"Latitude"`     // 纬度
 	StreamName   string        `xml:"-"`
 	serial       string
-	mediaInfo    struct {
-		IsInvite   bool
-		Ssrc       uint32
-		StreamName string
-	}
+	mediaserver.MediaInfo
 }
 
 type ChannelStatus string
@@ -56,9 +57,13 @@ const (
 	ChannelOffStatus = "OFF"
 )
 
-func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName, network string) {
+func (channel *Channel) WithMediaServer(observer IMediaOpObserver) {
+	channel.observer = observer
+}
+
+func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName string, playInfo *PlayInfo) {
 	if channel.CanInvite(streamName) {
-		go channel.Invite(opt, conf, streamName, network)
+		go channel.Invite(opt, conf, streamName, playInfo)
 	}
 }
 
@@ -71,7 +76,7 @@ func (channel *Channel) CanInvite(streamName string) bool {
 		return false
 	}
 
-	if channel.mediaInfo.IsInvite {
+	if channel.MediaInfo.IsInvite {
 		return false
 	}
 
@@ -133,7 +138,7 @@ f字段中视、音频参数段之间不需空格分割。
 可使用f字段中的分辨率参数标识同一设备不同分辨率的码流。
 */
 
-func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName, network string) (code int, err error) {
+func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName string, playInfo *PlayInfo) (code int, err error) {
 	d := channel.device
 	s := "Play"
 
@@ -147,14 +152,20 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	}
 	opt.CreateSSRC(channel.serial, channel.number)
 
-	protocol := ""
-	nazalog.Info("networkType:", network)
+	var mediaserver *mediaserver.GB28181MediaServer
+	if channel.observer != nil {
+		mediaserver = channel.observer.OnStartMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId)
+	}
+	if mediaserver == nil {
+		return http.StatusNotFound, err
+	}
 
-	if network == "tcp" {
-		opt.MediaPort = conf.MediaConfig.TCPListenPort
+	protocol := ""
+	if playInfo.NetWork == "tcp" {
+		opt.MediaPort = mediaserver.GetListenerPort()
 		protocol = "TCP/"
 	} else {
-		opt.MediaPort = conf.MediaConfig.UDPListenPort
+		opt.MediaPort = mediaserver.GetListenerPort()
 	}
 
 	sdpInfo := []string{
@@ -169,7 +180,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 		"y=" + opt.ssrc,
 	}
 
-	if network == "tcp" {
+	if playInfo.NetWork == "tcp" {
 		sdpInfo = append(sdpInfo, "a=setup:passive", "a=connection:new")
 	}
 
@@ -209,33 +220,67 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 						nazalog.Info("Device support tcp")
 					} else {
 						nazalog.Info("Device not support tcp")
-						network = "udp"
 					}
 				}
 			}
 		}
-
-		channel.mediaInfo.IsInvite = true
-		channel.mediaInfo.Ssrc = opt.SSRC
-		channel.mediaInfo.StreamName = streamName
+		channel.MediaInfo.IsInvite = true
+		channel.MediaInfo.Ssrc = opt.SSRC
+		channel.MediaInfo.StreamName = streamName
+		channel.MediaInfo.MediaKey = fmt.Sprintf("%s%d", playInfo.NetWork, mediaserver.GetListenerPort())
 
 		ackReq := sip.NewAckRequest("", invite, inviteRes, "", nil)
+		//保存一下播放信息
 		channel.ackReq = ackReq
+		channel.playInfo = playInfo
 
 		err = sipsvr.Send(ackReq)
+	} else {
+		if !playInfo.SinglePort {
+			if channel.observer != nil {
+				if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
+					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
+				}
+			}
+		}
 	}
 	return
 }
+func (channel *Channel) GetCallId() string {
+	if channel.ackReq != nil {
+		if callId, ok := channel.ackReq.CallID(); ok {
+			return callId.Value()
+		}
+	}
+	return ""
+}
+func (channel *Channel) stopMediaServer() (err error) {
+	if channel.playInfo != nil {
+		if !channel.playInfo.SinglePort {
+			if channel.observer != nil {
+				if err = channel.observer.OnStopMediaServer(channel.playInfo.NetWork, channel.playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
+					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
+				}
+			}
+		}
+	}
+	return
+}
+func (channel *Channel) byeClear() (err error) {
+	err = channel.stopMediaServer()
+	channel.ackReq = nil
+	channel.MediaInfo.Clear()
+	return
+}
 func (channel *Channel) Bye(streamName string) (err error) {
+	err = channel.stopMediaServer()
 	if channel.ackReq != nil {
 		byeReq := channel.ackReq
+		channel.ackReq = nil
 		byeReq.SetMethod(sip.BYE)
 		seq, _ := byeReq.CSeq()
 		seq.SeqNo += 1
-		err = sipsvr.Send(byeReq)
-		if err == nil {
-			channel.ackReq = nil
-		}
+		sipsvr.Send(byeReq)
 		return err
 	} else {
 		return errors.New("channel has been closed")

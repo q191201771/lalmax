@@ -18,6 +18,7 @@ type Config struct {
 	ServerId         string           `json:"server_id"`       // http 通知唯一标识
 	HttpNotifyConfig HttpNotifyConfig `json:"http_notify"`     // http 通知配置
 	LalSvrConfigPath string           `json:"lal_config_path"` // lal配置目录
+	HookConfig       HookConfig       `json:"hook_config"`
 }
 
 type SrtConfig struct {
@@ -33,11 +34,18 @@ type RtcConfig struct {
 }
 
 type HttpConfig struct {
-	ListenAddr      string `json:"http_listen_addr"`  // http服务监听地址
-	EnableHttps     bool   `json:"enable_https"`      // https使能标志
-	HttpsListenAddr string `json:"https_listen_addr"` // https监听地址
-	HttpsCertFile   string `json:"https_cert_file"`   // https cert 文件
-	HttpsKeyFile    string `json:"https_key_file"`    // https key 文件
+	ListenAddr        string            `json:"http_listen_addr"`  // http服务监听地址
+	EnableHttps       bool              `json:"enable_https"`      // https使能标志
+	HttpsListenAddr   string            `json:"https_listen_addr"` // https监听地址
+	HttpsCertFile     string            `json:"https_cert_file"`   // https cert 文件
+	HttpsKeyFile      string            `json:"https_key_file"`    // https key 文件
+	CtrlAuthWhitelist CtrlAuthWhitelist `json:"ctrl_auth_whitelist"`
+}
+
+// CtrlAuthWhitelist 控制类接口鉴权
+type CtrlAuthWhitelist struct {
+	IPs     []string // 允许访问的远程 IP，零值时不生效
+	Secrets []string // 认证信息，零值时不生效
 }
 
 type HttpFmp4Config struct {
@@ -68,9 +76,9 @@ type GB28181Config struct {
 }
 
 type GB28181MediaConfig struct {
-	MediaIp       string `json:"mediaIp"`         // 流媒体IP,用于在SDP中指定
-	TCPListenPort uint16 `json:"tcp_listen_port"` // tcp监听端口
-	UDPListenPort uint16 `json:"udp_listen_port"` // udp监听端口
+	MediaIp               string `json:"mediaIp"`                  // 流媒体IP,用于在SDP中指定
+	ListenPort            uint16 `json:"listen_port"`              // tcp,udp监听端口 默认启动
+	MultiPortMaxIncrement uint16 `json:"multi_port_max_increment"` //多端口范围 ListenPort+1至ListenPort+MultiPortMax
 }
 
 type OnvifConfig struct {
@@ -90,6 +98,11 @@ type HttpNotifyConfig struct {
 	OnRelayPullStop   string `json:"on_relay_pull_stop"`
 	OnRtmpConnect     string `json:"on_rtmp_connect"`
 	OnHlsMakeTs       string `json:"on_hls_make_ts"`
+}
+
+type HookConfig struct {
+	GopCacheNum          int `json:"gop_cache_num"`
+	SingleGopMaxFrameNum int `json:"single_gop_max_frame_num"`
 }
 
 func Open(filepath string) error {

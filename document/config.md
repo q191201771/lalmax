@@ -70,6 +70,23 @@
 
 *值举例*: "./conf/key.pem"
 
+- ctrl_auth_whitelist: 统计控制类接口鉴权，用于访问以 `/api/stat` 和 `/api/ctrl` 前缀的接口，无权限访问时 http status 将会响应 200，其 error_code 为 401。多种鉴权方式都不是零值时，必须同时满足才会通过鉴权。
+
+*类型*: object
+
+- secrets: 用户请求鉴权的方式是增加 query 参数 `token`，例如 `token=secret`，满足数组中任意匹配则通过。
+
+*类型*: []string
+
+*值举例*: ["EC3D1536-5D93-4BD6-9FBD-96A52CB1596D"]
+
+- ips: 远程 IP 白名单，空数组表示允许任意 IP 访问，无权限访问时 http status 将会响应 200，其 error_code 为 401。
+
+*类型*: []string
+
+*值举例*: ["192.168.1.2","192.168.1.3"]
+
+
 # http-fmp4配置
 主要用于设置http-fmp4相关的配置,需要配合http_config一起使用
 - enable: http-fmp4服务使能配置
@@ -110,6 +127,22 @@
 
 *值举例*: true
 
+# hook_config
+主要用于 hook 相关的配置。
+
+- gop_cache_num: gop 缓存的数量，默认为 1
+
+*类型*: int
+
+*值举例*: 3
+
+- single_gop_max_frame_num: 一个 gop 的缓存帧数，0 表示智能识别
+
+*类型*: int
+
+*值举例*: 120
+
+
 # gb28181_config
 
 - enable: gb28181使能配置
@@ -125,43 +158,43 @@
 *值举例*: "0.0.0.0"
 
 - sipNetwork: 传输协议
-  
+
 *类型*: string
 
 *值举例*: "udp"
 
 - sipIp: sip服务器公网IP
-  
+
 *类型*: string
 
 *值举例*: "100.100.100.101"
 
 - sipPort: sip服务器公网端口
-  
+
 *类型*: uint16
 
 *值举例*: 5060
 
 - serial: sip服务器ID
-  
+
 *类型*: string
 
 *值举例*: "34020000002000000001"
 
 - realm: sip服务器域
-  
+
 *类型*: string
 
 *值举例*: "3402000000"
 
 - username: sip服务器账号
-  
+
 *类型*: string
 
 *值举例*: "admin"
 
 - password: sip服务器密码
-  
+
 *类型*: string
 
 *值举例*: "admin123"

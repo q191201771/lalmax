@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"lalmax/gb28181/mpegps"
 	"net"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
-	"github.com/yapingcat/gomedia/go-mpeg2"
 )
 
 var (
@@ -32,23 +32,30 @@ type Conn struct {
 	conn       net.Conn
 	r          io.Reader
 	check      bool
-	demuxer    *mpeg2.PSDemuxer
+	demuxer    *mpegps.PSDemuxer
 	streamName string
 	lalServer  logic.ILalServer
 	lalSession logic.ICustomizePubSessionContext
 	videoFrame Frame
 	audioFrame Frame
 
-	CheckSsrc   func(ssrc uint32) (string, bool)
-	NotifyClose func(streamName string)
-	buffer      *bytes.Buffer
+	observer IGbObserver
+
+	rtpPts         uint64
+	psPtsZeroTimes int64
+
+	psDumpFile *base.DumpFile
+
+	buffer *bytes.Buffer
+	key    string
 }
 
-func NewConn(conn net.Conn, lal logic.ILalServer) *Conn {
+func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
 	c := &Conn{
 		conn:      conn,
 		r:         conn,
-		demuxer:   mpeg2.NewPSDemuxer(),
+		demuxer:   mpegps.NewPSDemuxer(),
+		observer:  observer,
 		lalServer: lal,
 		buffer:    bytes.NewBuffer(nil),
 	}
@@ -57,19 +64,21 @@ func NewConn(conn net.Conn, lal logic.ILalServer) *Conn {
 
 	return c
 }
-
+func (c *Conn) SetKey(key string) {
+	c.key = key
+}
 func (c *Conn) Serve() (err error) {
 	defer func() {
 		nazalog.Info("conn close, err:", err)
 		c.conn.Close()
 
-		if c.check {
-			if c.NotifyClose != nil {
-				c.NotifyClose(c.streamName)
-			}
-
-			c.lalServer.DelCustomizePubSession(c.lalSession)
+		if c.observer != nil {
+			c.observer.NotifyClose(c.streamName)
 		}
+		if c.psDumpFile != nil {
+			c.psDumpFile.Close()
+		}
+		c.lalServer.DelCustomizePubSession(c.lalSession)
 	}()
 
 	nazalog.Info("gb28181 conn, remoteaddr:", c.conn.RemoteAddr().String(), " localaddr:", c.conn.LocalAddr().String())
@@ -78,7 +87,7 @@ func (c *Conn) Serve() (err error) {
 		c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 		pkt := &rtp.Packet{}
 		if c.conn.RemoteAddr().Network() == "udp" {
-			buf := make([]byte, 1472)
+			buf := make([]byte, 1472*4)
 			n, err := c.conn.Read(buf)
 			if err != nil {
 				nazalog.Error("conn read failed, err:", err)
@@ -109,19 +118,33 @@ func (c *Conn) Serve() (err error) {
 			}
 		}
 
-		if !c.check && c.CheckSsrc != nil {
-			streamName, ok := c.CheckSsrc(pkt.SSRC)
-			if !ok {
-				nazalog.Error("invalid ssrc:", pkt.SSRC)
-				return fmt.Errorf("invalid ssrc:%d", pkt.SSRC)
+		if !c.check && c.observer != nil {
+			var mediaInfo *MediaInfo
+			var ok bool
+			if pkt.SSRC != 0 {
+				mediaInfo, ok = c.observer.CheckSsrc(pkt.SSRC)
+				if !ok {
+					nazalog.Error("invalid ssrc:", pkt.SSRC)
+					return fmt.Errorf("invalid ssrc:%d", pkt.SSRC)
+				}
+			} else {
+				mediaInfo, ok = c.observer.GetMediaInfoByKey(c.key)
+				if !ok {
+					nazalog.Error("get mediaInfo :", c.key)
+					return fmt.Errorf("get mediaInfo:%d", c.key)
+				}
 			}
-
 			c.check = true
-			c.streamName = streamName
-
+			c.streamName = mediaInfo.StreamName
+			if len(mediaInfo.DumpFileName) > 0 {
+				c.psDumpFile = base.NewDumpFile()
+				if err = c.psDumpFile.OpenToWrite(mediaInfo.DumpFileName); err != nil {
+					nazalog.Errorf("gb con dump file:%s", err.Error())
+				}
+			}
 			nazalog.Info("gb28181 ssrc check success, streamName:", c.streamName)
 
-			session, err := c.lalServer.AddCustomizePubSession(streamName)
+			session, err := c.lalServer.AddCustomizePubSession(mediaInfo.StreamName)
 			if err != nil {
 				nazalog.Error("lal server AddCustomizePubSession failed, err:", err)
 				return err
@@ -133,8 +156,13 @@ func (c *Conn) Serve() (err error) {
 
 			c.lalSession = session
 		}
-
-		c.Demuxer(pkt.Payload)
+		c.rtpPts = uint64(pkt.Header.Timestamp)
+		if c.demuxer != nil {
+			if c.psDumpFile != nil {
+				c.psDumpFile.WriteWithType(pkt.Payload, base.DumpTypePsRtpData)
+			}
+			c.demuxer.Input(pkt.Payload)
+		}
 	}
 	return
 }
@@ -170,12 +198,23 @@ func (c *Conn) Demuxer(data []byte) error {
 	return nil
 }
 
-func (c *Conn) OnFrame(frame []byte, cid mpeg2.PS_STREAM_TYPE, pts uint64, dts uint64) {
+func (c *Conn) OnFrame(frame []byte, cid mpegps.PS_STREAM_TYPE, pts uint64, dts uint64) {
 	payloadType := getPayloadType(cid)
 	if payloadType == base.AvPacketPtUnknown {
 		return
 	}
-
+	//当ps流解析出pts为0时，计数超过10则用rtp的时间戳
+	if pts == 0 {
+		if c.psPtsZeroTimes >= 0 {
+			c.psPtsZeroTimes++
+		}
+		if c.psPtsZeroTimes > 10 {
+			pts = c.rtpPts
+			dts = c.rtpPts
+		}
+	} else {
+		c.psPtsZeroTimes = -1
+	}
 	if payloadType == base.AvPacketPtAac || payloadType == base.AvPacketPtG711A || payloadType == base.AvPacketPtG711U {
 		if c.audioFrame.initDts == 0 {
 			c.audioFrame.initDts = dts
@@ -224,17 +263,17 @@ func (c *Conn) OnFrame(frame []byte, cid mpeg2.PS_STREAM_TYPE, pts uint64, dts u
 	}
 }
 
-func getPayloadType(cid mpeg2.PS_STREAM_TYPE) base.AvPacketPt {
+func getPayloadType(cid mpegps.PS_STREAM_TYPE) base.AvPacketPt {
 	switch cid {
-	case mpeg2.PS_STREAM_AAC:
+	case mpegps.PS_STREAM_AAC:
 		return base.AvPacketPtAac
-	case mpeg2.PS_STREAM_G711A:
+	case mpegps.PS_STREAM_G711A:
 		return base.AvPacketPtG711A
-	case mpeg2.PS_STREAM_G711U:
+	case mpegps.PS_STREAM_G711U:
 		return base.AvPacketPtG711U
-	case mpeg2.PS_STREAM_H264:
+	case mpegps.PS_STREAM_H264:
 		return base.AvPacketPtAvc
-	case mpeg2.PS_STREAM_H265:
+	case mpegps.PS_STREAM_H265:
 		return base.AvPacketPtHevc
 	}
 

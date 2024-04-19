@@ -26,10 +26,12 @@ type ChannelItem struct {
 	StreamName   string        `json:"-"`
 }
 type PlayInfo struct {
-	NetWork    string `json:"network" form:"network" url:"network"`             // 媒体传输类型,tcp/udp,默认udp
-	DeviceId   string `json:"device_id" form:"device_id" url:"device_id"`       // 设备 Id
-	ChannelId  string `json:"channel_id" form:"channel_id" url:"channel_id"`    // channel id
-	StreamName string `json:"stream_name" form:"stream_name" url:"stream_name"` // ssrc对应的流名
+	NetWork      string `json:"network" form:"network" url:"network"`                      // 媒体传输类型,tcp/udp,默认udp
+	DeviceId     string `json:"device_id" form:"device_id" url:"device_id"`                // 设备 Id
+	ChannelId    string `json:"channel_id" form:"channel_id" url:"channel_id"`             // channel id
+	StreamName   string `json:"stream_name" form:"stream_name" url:"stream_name"`          // 对应的流名
+	SinglePort   bool   `json:"single_port" form:"single_port" url:"single_port"`          // 是否单端口
+	DumpFileName string `json:"dump_file_name" form:"dump_file_name" url:"dump_file_name"` // dump文件路径
 }
 type ReqPlay struct {
 	PlayInfo

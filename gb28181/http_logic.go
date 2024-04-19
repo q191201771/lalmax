@@ -34,13 +34,16 @@ func (g *GbLogic) StartPlay(c *gin.Context) {
 		ch := g.s.FindChannel(reqPlay.DeviceId, reqPlay.ChannelId)
 		if ch == nil {
 			ResponseErrorWithMsg(c, CodeDeviceNotRegister, CodeDeviceNotRegister.Msg())
-
 		} else {
 			streamName := reqPlay.StreamName
 			if len(streamName) == 0 {
 				streamName = reqPlay.ChannelId
 			}
-			ch.TryAutoInvite(&InviteOptions{}, g.s.conf, streamName, reqPlay.NetWork)
+			if len(reqPlay.NetWork) == 0 || !(reqPlay.NetWork == "udp" || reqPlay.NetWork == "tcp") {
+				reqPlay.NetWork = "udp"
+			}
+
+			ch.TryAutoInvite(&InviteOptions{}, g.s.conf, streamName, &reqPlay.PlayInfo)
 			respPlay := &RespPlay{
 				StreamName: streamName,
 			}
@@ -69,7 +72,6 @@ func (g *GbLogic) StopPlay(c *gin.Context) {
 			}
 		}
 	}
-
 }
 func (g *GbLogic) UpdateAllNotify(c *gin.Context) {
 	g.s.GetAllSyncChannels()

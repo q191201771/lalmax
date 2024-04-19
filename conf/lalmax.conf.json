@@ -14,13 +14,21 @@
     "enable_https": true,
     "https_listen_addr": ":1233",
     "https_cert_file": "./conf/cert.pem",
-    "https_key_file": "./conf/key.pem"
+    "https_key_file": "./conf/key.pem",
+    "ctrl_auth_whitelist": {
+      "ips": [],
+      "secrets": []
+    }
   },
   "httpfmp4_config": {
     "enable": true
   },
   "hls_config": {
     "enable": true
+  },
+  "hook_config": {
+    "gop_cache_num": 1,
+    "single_gop_max_frame_num": 0
   },
   "gb28181_config": {
     "enable": true,
