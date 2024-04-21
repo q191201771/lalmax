@@ -70,6 +70,7 @@ func (c *GopCache) feedLastGop(msg base.RtmpMsg) {
 	if c.isGopRingEmpty() {
 		return
 	}
+
 	idx := (c.last - 1 + c.gopSize) % c.gopSize
 	if c.singleGopMaxFrameNum == 0 || c.data[idx].size() <= c.singleGopMaxFrameNum {
 		c.data[idx].feed(msg)

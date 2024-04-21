@@ -22,6 +22,7 @@ type HookSession struct {
 	consumers  sync.Map
 	hlssvr     *hls.HlsServer
 	gopCache   *GopCache
+	hasVideo   bool
 }
 
 type consumerInfo struct {
@@ -93,7 +94,6 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 		session.hlssvr.OnMsg(session.streamName, msg)
 	}
 
-	// TODO:做缓存处理/纯音频
 	session.consumers.Range(func(key, value interface{}) bool {
 		c := value.(*consumerInfo)
 
@@ -129,12 +129,16 @@ func (session *HookSession) OnMsg(msg base.RtmpMsg) {
 
 			c.subscriber.OnMsg(msg)
 		} else if msg.Header.MsgTypeId == base.RtmpTypeIdAudio {
-			if c.hasSendVideo {
+			if !session.hasVideo || c.hasSendVideo {
 				c.subscriber.OnMsg(msg)
 			}
 		}
 		return true
 	})
+
+	if !session.hasVideo && msg.IsVideoKeyNalu() {
+		session.hasVideo = true
+	}
 
 	session.gopCache.Feed(msg)
 }
