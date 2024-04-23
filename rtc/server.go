@@ -111,7 +111,50 @@ func (s *RtcServer) HandleWHIP(c *gin.Context) {
 
 	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
 }
+func (s *RtcServer) HandleJessibuca(c *gin.Context) {
+	streamid := c.Param("streamid")
+	if streamid == "" {
+		c.Status(http.StatusMethodNotAllowed)
+		return
+	}
 
+	body, err := c.GetRawData()
+	if err != nil {
+		nazalog.Error(err)
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	if len(body) == 0 {
+		nazalog.Error("invalid body")
+		c.Status(http.StatusNoContent)
+		return
+	}
+
+	pc, err := newPeerConnection(s.config.ICEHostNATToIPs, s.udpMux, s.tcpMux)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	jessibucaSession := NewJessibucaSession(streamid, pc, s.lalServer)
+	if jessibucaSession == nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Header("Location", fmt.Sprintf("jessibucaflv/%s", jessibucaSession.subscriberId))
+
+	sdp := jessibucaSession.GetAnswerSDP(string(body))
+	if sdp == "" {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	go jessibucaSession.Run()
+
+	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
+}
 func (s *RtcServer) HandleWHEP(c *gin.Context) {
 	streamid := c.Request.URL.Query().Get("streamid")
 	if streamid == "" {

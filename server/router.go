@@ -29,6 +29,9 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 	router.POST("/whep", s.HandleWHEP)
 	router.OPTIONS("/whep", s.HandleWHEP)
 	router.DELETE("/whep", s.HandleWHEP)
+	//Jessibuca flv封装play
+	router.POST("/webrtc/play/live/:streamid", s.HandleJessibuca)
+	router.DELETE("/webrtc/play/live/:streamid", s.HandleJessibuca)
 
 	// http-fmp4
 	router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
@@ -77,6 +80,17 @@ func (s *LalMaxServer) HandleWHEP(c *gin.Context) {
 	case "POST":
 		if s.rtcsvr != nil {
 			s.rtcsvr.HandleWHEP(c)
+		}
+	case "DELETE":
+		// TODO 实现DELETE
+		c.Status(http.StatusOK)
+	}
+}
+func (s *LalMaxServer) HandleJessibuca(c *gin.Context) {
+	switch c.Request.Method {
+	case "POST":
+		if s.rtcsvr != nil {
+			s.rtcsvr.HandleJessibuca(c)
 		}
 	case "DELETE":
 		// TODO 实现DELETE
