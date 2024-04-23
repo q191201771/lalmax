@@ -3,7 +3,6 @@ module lalmax
 go 1.18
 
 require (
-	github.com/abema/go-mp4 v1.2.0
 	github.com/bluenviron/gohlslib v1.3.0
 	github.com/bluenviron/gortsplib/v4 v4.8.0
 	github.com/bluenviron/mediacommon v1.9.2
@@ -26,6 +25,7 @@ require (
 )
 
 require (
+	github.com/abema/go-mp4 v1.2.0 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/asticode/go-astits v1.13.0 // indirect
 	github.com/beevik/etree v1.1.0 // indirect
