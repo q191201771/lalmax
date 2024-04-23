@@ -46,10 +46,6 @@ func NewJessibucaSession(streamid string, pc *peerConnection, lalServer logic.IL
 		closeChan:    make(chan bool, 2),
 	}
 }
-
-func (conn *jessibucaSession) SetRemoteSafari(val bool) {
-	conn.remoteSafari = val
-}
 func (conn *jessibucaSession) createDataChannel() {
 	if conn.DC != nil {
 		return
@@ -134,6 +130,7 @@ func (conn *jessibucaSession) Run() {
 				defer func() {
 					conn.DC.Close()
 					conn.pc.Close()
+					conn.DC = nil
 					nazalog.Info("RemoveConsumer, connid:", conn.subscriberId)
 					conn.hooks.RemoveConsumer(conn.subscriberId)
 				}()
