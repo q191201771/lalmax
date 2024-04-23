@@ -89,6 +89,9 @@ srt://127.0.0.1:6001?streamid=test110
 
  (4) WHEP支持对接Safari HEVC
 
+ (5)支持jessibuca播放HEVC  
+    播放地址：webrtc://127.0.0.1:1290/webrtc/play/live/test110
+
 WHIP推流url
 http(s)://127.0.0.1:1290/whip?streamid=test110
 
