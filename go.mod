@@ -18,6 +18,7 @@ require (
 	github.com/q191201771/lal v0.37.4
 	github.com/q191201771/naza v0.30.48
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
+	github.com/smallnest/chanx v1.2.0
 	github.com/use-go/onvif v0.0.9
 	github.com/yapingcat/gomedia v0.0.0-20240316172424-76660eca7389
 	golang.org/x/net v0.21.0

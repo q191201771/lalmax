@@ -1,6 +1,7 @@
 package rtc
 
 import (
+	"context"
 	"github.com/gofrs/uuid"
 	"github.com/pion/webrtc/v3"
 	"github.com/q191201771/lal/pkg/base"
@@ -8,6 +9,7 @@ import (
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/lal/pkg/remux"
 	"github.com/q191201771/naza/pkg/nazalog"
+	"github.com/smallnest/chanx"
 	"lalmax/hook"
 	"math"
 )
@@ -21,7 +23,7 @@ type jessibucaSession struct {
 	audioTrack   *webrtc.TrackLocalStaticRTP
 	videopacker  *Packer
 	audiopacker  *Packer
-	msgChan      chan base.RtmpMsg
+	msgChan      *chanx.UnboundedChan[base.RtmpMsg]
 	closeChan    chan bool
 	remoteSafari bool
 	DC           *webrtc.DataChannel
@@ -42,7 +44,7 @@ func NewJessibucaSession(streamid string, pc *peerConnection, lalServer logic.IL
 		lalServer:    lalServer,
 		subscriberId: u.String(),
 		streamId:     streamid,
-		msgChan:      make(chan base.RtmpMsg, 128),
+		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), 512),
 		closeChan:    make(chan bool, 2),
 	}
 }
@@ -136,7 +138,7 @@ func (conn *jessibucaSession) Run() {
 				}()
 				for {
 					select {
-					case msg := <-conn.msgChan:
+					case msg := <-conn.msgChan.Out:
 						lazyRtmpMsg2FlvTag := remux.LazyRtmpMsg2FlvTag{}
 						lazyRtmpMsg2FlvTag.Init(msg)
 						buf := lazyRtmpMsg2FlvTag.GetEnsureWithoutSdf()
@@ -181,14 +183,14 @@ func (conn *jessibucaSession) OnMsg(msg base.RtmpMsg) {
 		return
 	case base.RtmpTypeIdAudio:
 		if conn.DC != nil {
-			conn.msgChan <- msg
+			conn.msgChan.In <- msg
 		}
 	case base.RtmpTypeIdVideo:
 		if msg.IsVideoKeySeqHeader() {
 			return
 		}
 		if conn.DC != nil {
-			conn.msgChan <- msg
+			conn.msgChan.In <- msg
 		}
 	}
 }
