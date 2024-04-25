@@ -26,7 +26,7 @@ type whepSession struct {
 	remoteSafari bool
 }
 
-func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalServer) *whepSession {
+func NewWhepSession(streamid string, writeChanSize int, pc *peerConnection, lalServer logic.ILalServer) *whepSession {
 	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(streamid)
 	if !ok {
 		nazalog.Error("not found streamid:", streamid)
@@ -39,7 +39,7 @@ func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 		pc:           pc,
 		lalServer:    lalServer,
 		subscriberId: u.String(),
-		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), 512),
+		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), writeChanSize),
 		closeChan:    make(chan bool, 2),
 	}
 }

@@ -27,10 +27,11 @@ type SrtConfig struct {
 }
 
 type RtcConfig struct {
-	Enable          bool     `json:"enable"`          // rtc服务使能配置
-	ICEHostNATToIPs []string `json:"iceHostNatToIps"` // rtc服务公网IP，未设置使用内网
-	ICEUDPMuxPort   int      `json:"iceUdpMuxPort"`   // rtc udp mux port
-	ICETCPMuxPort   int      `json:"iceTcpMuxPort"`   // rtc tcp mux port
+	Enable          bool     `json:"enable"`              // rtc服务使能配置
+	ICEHostNATToIPs []string `json:"ice_host_nat_to_ips"` // rtc服务公网IP，未设置使用内网
+	ICEUDPMuxPort   int      `json:"ice_udp_mux_port"`    // rtc udp mux port
+	ICETCPMuxPort   int      `json:"ice_tcp_mux_port"`    // rtc tcp mux port
+	WriteChanSize   int      `json:"write_chan_size"`
 }
 
 type HttpConfig struct {
@@ -53,30 +54,30 @@ type HttpFmp4Config struct {
 }
 
 type HlsConfig struct {
-	Enable          bool `json:"enable"`          // hls使能标志
-	SegmentCount    int  `json:"segmentCount"`    // 分片个数,llhls默认7个
-	SegmentDuration int  `json:"segmentDuration"` // hls分片时长,默认1s
-	PartDuration    int  `json:"partDuration"`    // llhls part时长,默认200ms
-	LowLatency      bool `json:"lowLatency"`      // 是否开启llhls
+	Enable          bool `json:"enable"`           // hls使能标志
+	SegmentCount    int  `json:"segment_count"`    // 分片个数,llhls默认7个
+	SegmentDuration int  `json:"segment_duration"` // hls分片时长,默认1s
+	PartDuration    int  `json:"part_duration"`    // llhls part时长,默认200ms
+	LowLatency      bool `json:"low_latency"`      // 是否开启llhls
 }
 
 type GB28181Config struct {
-	Enable            bool               `json:"enable"`            // gb28181使能标志
-	ListenAddr        string             `json:"listenAddr"`        // gb28181监听地址
-	SipNetwork        string             `json:"sipNetwork"`        // 传输协议，默认UDP，可选TCP
-	SipIP             string             `json:"sipIp"`             // sip 服务器公网IP
-	SipPort           uint16             `json:"sipPort"`           // sip 服务器端口，默认 5060
-	Serial            string             `json:"serial"`            // sip 服务器 id, 默认 34020000002000000001
-	Realm             string             `json:"realm"`             // sip 服务器域，默认 3402000000
-	Username          string             `json:"username"`          // sip 服务器账号
-	Password          string             `json:"password"`          // sip 服务器密码
-	KeepaliveInterval int                `json:"keepaliveInterval"` // 心跳包时长
-	QuickLogin        bool               `json:"quickLogin"`        // 快速登陆,有keepalive就认为在线
-	MediaConfig       GB28181MediaConfig `json:"media_config"`      // 媒体服务器配置
+	Enable            bool               `json:"enable"`             // gb28181使能标志
+	ListenAddr        string             `json:"listen_addr"`        // gb28181监听地址
+	SipNetwork        string             `json:"sip_network"`        // 传输协议，默认UDP，可选TCP
+	SipIP             string             `json:"sip_ip"`             // sip 服务器公网IP
+	SipPort           uint16             `json:"sip_port"`           // sip 服务器端口，默认 5060
+	Serial            string             `json:"serial"`             // sip 服务器 id, 默认 34020000002000000001
+	Realm             string             `json:"realm"`              // sip 服务器域，默认 3402000000
+	Username          string             `json:"username"`           // sip 服务器账号
+	Password          string             `json:"password"`           // sip 服务器密码
+	KeepaliveInterval int                `json:"keepalive_interval"` // 心跳包时长
+	QuickLogin        bool               `json:"quick_login"`        // 快速登陆,有keepalive就认为在线
+	MediaConfig       GB28181MediaConfig `json:"media_config"`       // 媒体服务器配置
 }
 
 type GB28181MediaConfig struct {
-	MediaIp               string `json:"mediaIp"`                  // 流媒体IP,用于在SDP中指定
+	MediaIp               string `json:"media_ip"`                 // 流媒体IP,用于在SDP中指定
 	ListenPort            uint16 `json:"listen_port"`              // tcp,udp监听端口 默认启动
 	MultiPortMaxIncrement uint16 `json:"multi_port_max_increment"` //多端口范围 ListenPort+1至ListenPort+MultiPortMax
 }

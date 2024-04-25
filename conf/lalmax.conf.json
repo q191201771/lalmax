@@ -5,9 +5,9 @@
   },
   "rtc_config": {
     "enable": true,
-    "iceHostNatToIps": [],
-    "iceUdpMuxPort": 4888,
-    "iceTcpMuxPort": 4888
+    "ice_host_nat_to_ips": [],
+    "ice_udp_mux_port": 4888,
+    "ice_tcp_mux_port": 4888
   },
   "http_config": {
     "http_listen_addr": ":1290",
@@ -34,14 +34,14 @@
     "enable": true,
     "serial": "34020000002000000001",
     "realm": "3402000000",
-    "sipIp": "192.168.254.165",
-    "sipPort": 5060,
-    "sipNetwork": "udp",
+    "sip_ip": "192.168.254.165",
+    "sip_port": 5060,
+    "sip_network": "udp",
     "username": "",
     "media_config": {
-      "mediaIp": "192.168.254.165"
+      "media_ip": "192.168.254.165"
     },
-    "quickLogin": true
+    "quick_login": true
   },
   "onvif_config": {
     "enable": true

@@ -30,7 +30,7 @@ type jessibucaSession struct {
 	streamId     string
 }
 
-func NewJessibucaSession(streamid string, pc *peerConnection, lalServer logic.ILalServer) *jessibucaSession {
+func NewJessibucaSession(streamid string, writeChanSize int, pc *peerConnection, lalServer logic.ILalServer) *jessibucaSession {
 	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(streamid)
 	if !ok {
 		nazalog.Error("not found streamid:", streamid)
@@ -44,7 +44,7 @@ func NewJessibucaSession(streamid string, pc *peerConnection, lalServer logic.IL
 		lalServer:    lalServer,
 		subscriberId: u.String(),
 		streamId:     streamid,
-		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), 512),
+		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), writeChanSize),
 		closeChan:    make(chan bool, 2),
 	}
 }
