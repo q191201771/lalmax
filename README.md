@@ -74,11 +74,13 @@ https://pengrl.com/lal/#/streamurllist
 
 （4）可以对接OBS/VLC
 
+```
 推流url
 srt://127.0.0.1:6001?streamid=publish:test110
 
 拉流url
 srt://127.0.0.1:6001?streamid=test110
+```
 
 ## [WebRTC](./document/rtc.md)
 （1）支持WHIP推流和WHEP拉流,暂时只支持POST信令
@@ -87,35 +89,42 @@ srt://127.0.0.1:6001?streamid=test110
 
 （3）可以对接OBS、vue-wish
 
- (4) WHEP支持对接Safari HEVC
+（4）WHEP支持对接Safari HEVC
 
- (5)支持jessibuca播放HEVC  
-    播放地址：webrtc://127.0.0.1:1290/webrtc/play/live/test110
+（5）支持datachannel,只支持对接jessibuca播放器
 
+datachannel播放地址：webrtc://127.0.0.1:1290/webrtc/play/live/test110
+
+```
 WHIP推流url
 http(s)://127.0.0.1:1290/whip?streamid=test110
 
 WHEP拉流url
 http(s)://127.0.0.1:1290/whep?streamid=test110
+```
 
 ## Http-fmp4
 (1) 支持H264/H265/AAC/G711A/G711U
 
+```
 拉流url
 http(s)://127.0.0.1:1290/live/m4s/test110.mp4
+```
 
 ## HLS(fmp4/Low Latency)
 (1) 支持H264/H265/AAC/OPUS
 
+```
 拉流url
 http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
+```
 
 ## [GB28181](./document/gb28181.md)
-(1) 作为SIP服务器与设备进行SIP交互,使用单端口收流
+(1) 作为SIP服务器与设备进行SIP交互,使用单端口/多端口收流
 
 (2) 提供相关API获取设备信息、播放某通道等功能
 
-(3) 支持H264/H265/AAC
+(3) 支持H264/H265/AAC/G711A/G711U
 
 (4) 支持TCP/UDP
 
