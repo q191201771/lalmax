@@ -152,6 +152,7 @@ func (c *Conn) Serve() (err error) {
 
 			session.WithOption(func(option *base.AvPacketStreamOption) {
 				option.VideoFormat = base.AvPacketStreamVideoFormatAnnexb
+				option.AudioFormat = base.AvPacketStreamAudioFormatAdtsAac
 			})
 
 			c.lalSession = session
