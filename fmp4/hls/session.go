@@ -3,7 +3,7 @@ package hls
 import (
 	"time"
 
-	config "lalmax/conf"
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/bluenviron/gohlslib"
 	"github.com/bluenviron/gohlslib/pkg/codecs"

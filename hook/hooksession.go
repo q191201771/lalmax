@@ -1,9 +1,10 @@
 package hook
 
 import (
-	"lalmax/fmp4/hls"
 	"sync"
 	"time"
+
+	"github.com/q191201771/lalmax/fmp4/hls"
 
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazalog"

@@ -3,12 +3,13 @@ package gb28181
 import (
 	"errors"
 	"fmt"
-	config "lalmax/conf"
-	"lalmax/gb28181/mediaserver"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	config "github.com/q191201771/lalmax/conf"
+	"github.com/q191201771/lalmax/gb28181/mediaserver"
 
 	"github.com/ghettovoice/gosip/sip"
 	"github.com/q191201771/naza/pkg/nazalog"

@@ -1,7 +1,7 @@
 package rtc
 
 import (
-	"lalmax/hook"
+	"github.com/q191201771/lalmax/hook"
 
 	"github.com/gofrs/uuid"
 	"github.com/pion/webrtc/v3"

@@ -3,13 +3,15 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	config "lalmax/conf"
-	"lalmax/hook"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/q191201771/lalmax/hook"
+
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/q191201771/lal/pkg/base"
 )
