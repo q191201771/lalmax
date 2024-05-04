@@ -3,15 +3,23 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	config "lalmax/conf"
-	"lalmax/fmp4/hls"
-	httpfmp4 "lalmax/fmp4/http-fmp4"
-	"lalmax/gb28181"
-	"lalmax/hook"
-	"lalmax/onvif"
-	"lalmax/rtc"
-	"lalmax/srt"
 	"net/http"
+
+	"github.com/q191201771/lalmax/srt"
+
+	"github.com/q191201771/lalmax/rtc"
+
+	"github.com/q191201771/lalmax/onvif"
+
+	"github.com/q191201771/lalmax/hook"
+
+	"github.com/q191201771/lalmax/gb28181"
+
+	httpfmp4 "github.com/q191201771/lalmax/fmp4/http-fmp4"
+
+	"github.com/q191201771/lalmax/fmp4/hls"
+
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/logic"

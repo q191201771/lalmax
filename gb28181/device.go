@@ -2,11 +2,12 @@ package gb28181
 
 import (
 	"context"
-	config "lalmax/conf"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/ghettovoice/gosip/sip"
 	"github.com/q191201771/naza/pkg/nazalog"

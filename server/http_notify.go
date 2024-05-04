@@ -9,10 +9,12 @@
 package server
 
 import (
-	config "lalmax/conf"
-	"lalmax/hook"
 	"net/http"
 	"time"
+
+	"github.com/q191201771/lalmax/hook"
+
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/naza/pkg/nazahttp"

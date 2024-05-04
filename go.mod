@@ -1,6 +1,6 @@
-module lalmax
+module github.com/q191201771/lalmax
 
-go 1.18
+go 1.19
 
 require (
 	github.com/bluenviron/gohlslib v1.3.0

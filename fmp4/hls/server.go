@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	config "lalmax/conf"
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/base"

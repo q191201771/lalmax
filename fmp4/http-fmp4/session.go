@@ -4,10 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"lalmax/hook"
 	"net/http"
 	"strings"
 	"sync"
+
+	"github.com/q191201771/lalmax/hook"
 
 	"github.com/gofrs/uuid"
 	"github.com/q191201771/naza/pkg/connection"

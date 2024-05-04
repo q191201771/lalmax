@@ -3,9 +3,11 @@ package server
 import (
 	"encoding/json"
 	"io"
-	"lalmax/gb28181"
-	"lalmax/hook"
 	"net/http"
+
+	"github.com/q191201771/lalmax/hook"
+
+	"github.com/q191201771/lalmax/gb28181"
 
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/base"

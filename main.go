@@ -3,15 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
-	"lalmax/server"
 	"os"
 	"path/filepath"
+
+	"github.com/q191201771/lalmax/server"
 
 	"github.com/q191201771/naza/pkg/nazalog"
 
 	"github.com/q191201771/lal/pkg/base"
 
-	config "lalmax/conf"
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/q191201771/naza/pkg/bininfo"
 )

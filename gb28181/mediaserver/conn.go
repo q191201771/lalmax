@@ -6,9 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"lalmax/gb28181/mpegps"
 	"net"
 	"time"
+
+	"github.com/q191201771/lalmax/gb28181/mpegps"
 
 	"github.com/pion/rtp"
 	"github.com/q191201771/lal/pkg/base"
