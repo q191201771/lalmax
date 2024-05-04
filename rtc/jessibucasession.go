@@ -85,7 +85,7 @@ func (conn *jessibucaSession) GetAnswerSDP(offer string) (sdp string) {
 }
 
 func (conn *jessibucaSession) Run() {
-	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(conn.streamId)
+	ok, _ := hook.GetHookSessionManagerInstance().GetHookSession(conn.streamId)
 	if ok {
 		conn.hooks.AddConsumer(conn.subscriberId, conn)
 
@@ -109,27 +109,6 @@ func (conn *jessibucaSession) Run() {
 					return
 				}
 
-				videoHeader := session.GetVideoSeqHeaderMsg()
-				audioHeader := session.GetAudioSeqHeaderMsg()
-
-				if videoHeader != nil {
-					lazyRtmpMsg2FlvTag := remux.LazyRtmpMsg2FlvTag{}
-					videoHeader.Header.TimestampAbs = 0
-					lazyRtmpMsg2FlvTag.Init(*videoHeader)
-					if err := conn.DC.Send(lazyRtmpMsg2FlvTag.GetEnsureWithoutSdf()); err != nil {
-						nazalog.Warnf(" stream write videoHeader err:%s", err.Error())
-						return
-					}
-				}
-				if audioHeader != nil {
-					lazyRtmpMsg2FlvTag := remux.LazyRtmpMsg2FlvTag{}
-					audioHeader.Header.TimestampAbs = 0
-					lazyRtmpMsg2FlvTag.Init(*audioHeader)
-					if err := conn.DC.Send(lazyRtmpMsg2FlvTag.GetEnsureWithoutSdf()); err != nil {
-						nazalog.Warnf("stream write audioHeader err:%s", err.Error())
-						return
-					}
-				}
 				defer func() {
 					conn.DC.Close()
 					conn.pc.Close()
@@ -187,9 +166,6 @@ func (conn *jessibucaSession) OnMsg(msg base.RtmpMsg) {
 			conn.msgChan.In <- msg
 		}
 	case base.RtmpTypeIdVideo:
-		if msg.IsVideoKeySeqHeader() {
-			return
-		}
 		if conn.DC != nil {
 			conn.msgChan.In <- msg
 		}
