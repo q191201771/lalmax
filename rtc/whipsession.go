@@ -39,7 +39,7 @@ func NewWhipSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 		lalServer:    lalServer,
 		lalSession:   session,
 		pktChan:      make(chan base.AvPacket, 100),
-		closeChan:    make(chan bool),
+		closeChan:    make(chan bool, 2),
 		subscriberId: u.String(),
 	}
 }

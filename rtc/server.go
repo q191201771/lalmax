@@ -40,7 +40,9 @@ func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) (*RtcServer, er
 		nazalog.Infof("webrtc ice udp listen. port=%d", config.ICEUDPMuxPort)
 		udpMux = webrtc.NewICEUDPMux(nil, udplistener)
 	}
-
+	if config.WriteChanSize == 0 {
+		config.WriteChanSize = 1024
+	}
 	if config.ICETCPMuxPort != 0 {
 		var tcplistener *net.TCPListener
 
@@ -137,7 +139,7 @@ func (s *RtcServer) HandleJessibuca(c *gin.Context) {
 		return
 	}
 
-	jessibucaSession := NewJessibucaSession(streamid, pc, s.lalServer)
+	jessibucaSession := NewJessibucaSession(streamid, s.config.WriteChanSize, pc, s.lalServer)
 	if jessibucaSession == nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -181,7 +183,7 @@ func (s *RtcServer) HandleWHEP(c *gin.Context) {
 		return
 	}
 
-	whepsession := NewWhepSession(streamid, pc, s.lalServer)
+	whepsession := NewWhepSession(streamid, s.config.WriteChanSize, pc, s.lalServer)
 	if whepsession == nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -212,7 +214,7 @@ func (s *RtcServer) handleWHEP(w http.ResponseWriter, r *http.Request, streamid,
 		return
 	}
 
-	whepsession := NewWhepSession(streamid, pc, s.lalServer)
+	whepsession := NewWhepSession(streamid, s.config.WriteChanSize, pc, s.lalServer)
 	if whepsession == nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

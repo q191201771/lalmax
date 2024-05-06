@@ -1,6 +1,8 @@
 package rtc
 
 import (
+	"context"
+	"github.com/smallnest/chanx"
 	"lalmax/hook"
 
 	"github.com/gofrs/uuid"
@@ -19,12 +21,12 @@ type whepSession struct {
 	audioTrack   *webrtc.TrackLocalStaticRTP
 	videopacker  *Packer
 	audiopacker  *Packer
-	msgChan      chan base.RtmpMsg
+	msgChan      *chanx.UnboundedChan[base.RtmpMsg]
 	closeChan    chan bool
 	remoteSafari bool
 }
 
-func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalServer) *whepSession {
+func NewWhepSession(streamid string, writeChanSize int, pc *peerConnection, lalServer logic.ILalServer) *whepSession {
 	ok, session := hook.GetHookSessionManagerInstance().GetHookSession(streamid)
 	if !ok {
 		nazalog.Error("not found streamid:", streamid)
@@ -37,8 +39,8 @@ func NewWhepSession(streamid string, pc *peerConnection, lalServer logic.ILalSer
 		pc:           pc,
 		lalServer:    lalServer,
 		subscriberId: u.String(),
-		msgChan:      make(chan base.RtmpMsg, 100),
-		closeChan:    make(chan bool),
+		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), writeChanSize),
+		closeChan:    make(chan bool, 2),
 	}
 }
 
@@ -173,7 +175,7 @@ func (conn *whepSession) Run() {
 
 	for {
 		select {
-		case msg := <-conn.msgChan:
+		case msg := <-conn.msgChan.Out:
 			if msg.Header.MsgTypeId == base.RtmpTypeIdAudio && conn.audioTrack != nil {
 				conn.sendAudio(msg)
 			} else if msg.Header.MsgTypeId == base.RtmpTypeIdVideo && conn.videoTrack != nil {
@@ -193,14 +195,14 @@ func (conn *whepSession) OnMsg(msg base.RtmpMsg) {
 		return
 	case base.RtmpTypeIdAudio:
 		if conn.audioTrack != nil {
-			conn.msgChan <- msg
+			conn.msgChan.In <- msg
 		}
 	case base.RtmpTypeIdVideo:
 		if msg.IsVideoKeySeqHeader() {
 			return
 		}
 		if conn.videoTrack != nil {
-			conn.msgChan <- msg
+			conn.msgChan.In <- msg
 		}
 	}
 }

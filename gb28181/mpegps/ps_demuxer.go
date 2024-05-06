@@ -245,51 +245,49 @@ func (psdemuxer *PSDemuxer) demuxPespacket(stream *psstream, pes *PesPacket) err
 }
 
 func (psdemuxer *PSDemuxer) demuxAudio(stream *psstream, pes *PesPacket) error {
-	if stream.pts != pes.Pts && len(stream.streamBuf) > 0 {
-		if psdemuxer.OnFrame != nil {
-			psdemuxer.OnFrame(stream.streamBuf, stream.cid, stream.pts/90, stream.dts/90)
-		}
-		stream.streamBuf = stream.streamBuf[:0]
+	if psdemuxer.OnFrame != nil {
+		psdemuxer.OnFrame(pes.Pes_payload, stream.cid, pes.Pts/90, pes.Dts/90)
 	}
-	stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
-	stream.pts = pes.Pts
-	stream.dts = pes.Dts
 	return nil
 }
 
 func (psdemuxer *PSDemuxer) demuxH26x(stream *psstream, pes *PesPacket) error {
-	if len(stream.streamBuf) == 0 {
+	if stream.pts == 0 {
+		stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
 		stream.pts = pes.Pts
 		stream.dts = pes.Dts
+	} else if stream.pts == pes.Pts || pes.Pts == 0 {
+		stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
+	} else {
+		start, sc := FindStartCode(stream.streamBuf, 0)
+		for start >= 0 && start < len(stream.streamBuf) {
+			end, sc2 := FindStartCode(stream.streamBuf, start+int(sc))
+			if end < 0 {
+				end = len(stream.streamBuf)
+			}
+			if stream.cid == PS_STREAM_H264 {
+				naluType := H264NaluType(stream.streamBuf[start:])
+				if naluType != avc.NaluTypeAud {
+					if psdemuxer.OnFrame != nil {
+						psdemuxer.OnFrame(stream.streamBuf[start:end], stream.cid, stream.pts/90, stream.dts/90)
+					}
+				}
+			} else if stream.cid == PS_STREAM_H265 {
+				naluType := H265NaluType(stream.streamBuf[start:])
+				if naluType != hevc.NaluTypeAud {
+					if psdemuxer.OnFrame != nil {
+						psdemuxer.OnFrame(stream.streamBuf[start:end], stream.cid, stream.pts/90, stream.dts/90)
+					}
+				}
+			}
+			start = end
+			sc = sc2
+		}
 		stream.streamBuf = nil
+		stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
+		stream.pts = pes.Pts
+		stream.dts = pes.Dts
 	}
-	stream.streamBuf = append(stream.streamBuf, pes.Pes_payload...)
-	start, sc := FindStartCode(stream.streamBuf, 0)
-	for start >= 0 {
-		end, sc2 := FindStartCode(stream.streamBuf, start+int(sc))
-		if end < 0 {
-			break
-		}
-		if stream.cid == PS_STREAM_H264 {
-			naluType := H264NaluType(stream.streamBuf[start:])
-			if naluType != avc.NaluTypeAud {
-				if psdemuxer.OnFrame != nil {
-					psdemuxer.OnFrame(stream.streamBuf[start:end], stream.cid, stream.pts/90, stream.dts/90)
-				}
-			}
-		} else if stream.cid == PS_STREAM_H265 {
-			naluType := H265NaluType(stream.streamBuf[start:])
-			if naluType != hevc.NaluTypeAud {
-				if psdemuxer.OnFrame != nil {
-					psdemuxer.OnFrame(stream.streamBuf[start:end], stream.cid, stream.pts/90, stream.dts/90)
-				}
-			}
-		}
-		start = end
-		sc = sc2
-	}
-	stream.streamBuf = stream.streamBuf[start:]
-	stream.pts = pes.Pts
-	stream.dts = pes.Dts
+
 	return nil
 }

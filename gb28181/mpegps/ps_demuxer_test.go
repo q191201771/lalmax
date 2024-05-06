@@ -92,7 +92,7 @@ func TestPSDemuxer(t *testing.T) {
 	os.Remove("h.h264")
 	os.Remove("ps_demux_result")
 	dumpFile := base.NewDumpFile()
-	err := dumpFile.OpenToRead("C:\\Users\\Administrator\\Desktop\\5_min_tcp_dump.raw")
+	err := dumpFile.OpenToRead("C:\\Users\\Administrator\\Desktop\\dump_37060000001320000001001.raw")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -101,6 +101,14 @@ func TestPSDemuxer(t *testing.T) {
 	psUnpacker.OnFrame = func(frame []byte, cid PS_STREAM_TYPE, pts uint64, dts uint64) {
 		if cid == PS_STREAM_H264 || cid == PS_STREAM_H265 {
 			writeFile("h.h264", frame)
+		} else {
+			if cid == PS_STREAM_G711A {
+				nazalog.Infof("存在音频g711A 大小：%d  dts:%d", len(frame), dts)
+			} else if cid == PS_STREAM_G711U {
+				nazalog.Infof("存在音频g711U 大小：%d  dts:%d", len(frame), dts)
+			} else {
+				nazalog.Infof("存在音频aac 大小：%d dts:%d", len(frame), dts)
+			}
 		}
 
 	}

@@ -152,6 +152,7 @@ func (c *Conn) Serve() (err error) {
 
 			session.WithOption(func(option *base.AvPacketStreamOption) {
 				option.VideoFormat = base.AvPacketStreamVideoFormatAnnexb
+				option.AudioFormat = base.AvPacketStreamAudioFormatAdtsAac
 			})
 
 			c.lalSession = session
@@ -240,26 +241,15 @@ func (c *Conn) OnFrame(frame []byte, cid mpegps.PS_STREAM_TYPE, pts uint64, dts 
 			c.videoFrame.initDts = dts
 		}
 
-		if dts-c.videoFrame.initDts != c.videoFrame.dts {
-			// 塞入lal中
-			var pkt base.AvPacket
-			pkt.PayloadType = payloadType
-			pkt.Timestamp = int64(c.videoFrame.dts)
-			pkt.Pts = int64(c.videoFrame.pts)
-			pkt.Payload = append(pkt.Payload, c.videoFrame.buffer.Bytes()...)
-			c.lalSession.FeedAvPacket(pkt)
-
-			c.videoFrame.buffer = bytes.NewBuffer(nil)
-		}
-
-		if c.videoFrame.buffer == nil {
-			c.videoFrame.buffer = bytes.NewBuffer(frame)
-		} else {
-			c.videoFrame.buffer.Write(frame)
-		}
-
+		// 塞入lal中
 		c.videoFrame.pts = pts - c.videoFrame.initPts
 		c.videoFrame.dts = dts - c.videoFrame.initDts
+		var pkt base.AvPacket
+		pkt.PayloadType = payloadType
+		pkt.Timestamp = int64(c.videoFrame.dts)
+		pkt.Pts = int64(c.videoFrame.pts)
+		pkt.Payload = frame
+		c.lalSession.FeedAvPacket(pkt)
 	}
 }
 
