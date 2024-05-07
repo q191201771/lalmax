@@ -2,7 +2,8 @@ package srt
 
 import (
 	"context"
-	"lalmax/hook"
+
+	"github.com/q191201771/lalmax/hook"
 
 	srt "github.com/datarhei/gosrt"
 	"github.com/gofrs/uuid"

@@ -2,10 +2,11 @@ package rtc
 
 import (
 	"fmt"
-	config "lalmax/conf"
 	"net"
 	"net/http"
 	"strings"
+
+	config "github.com/q191201771/lalmax/conf"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pion/ice/v2"
