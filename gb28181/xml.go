@@ -1,6 +1,9 @@
 package gb28181
 
-import "fmt"
+import (
+	"encoding/xml"
+	"fmt"
+)
 
 var (
 	// CatalogXML 获取设备列表xml样式
@@ -62,4 +65,14 @@ func BuildAlarmResponseXML(id string) string {
 
 func BuildDeviceInfoXML(sn int, id string) string {
 	return fmt.Sprintf(DeviceInfoXML, sn, id)
+}
+
+func XmlEncode(v interface{}) (string, error) {
+	xmlData, err := xml.MarshalIndent(v, "", " ")
+	if err != nil {
+		return "", err
+	}
+	xml := string(xmlData)
+	xml = `<?xml version="1.0" ?>` + "\n" + xml + "\n"
+	return xml, err
 }

@@ -57,22 +57,23 @@ type Device struct {
 	Latitude     string    //纬度
 
 	observer IMediaOpObserver
+	conf     config.GB28181Config
 }
 
 func (d *Device) WithMediaServer(observer IMediaOpObserver) {
 	d.observer = observer
 }
 
-func (d *Device) syncChannels(conf config.GB28181Config) {
+func (d *Device) syncChannels() {
 	if time.Since(d.lastSyncTime) > 2*time.Second {
 		d.lastSyncTime = time.Now()
-		d.Catalog(conf)
+		d.Catalog(d.conf)
 		//d.Subscribe(conf)
 		//d.QueryDeviceInfo(conf)
 	}
 }
 
-func (d *Device) UpdateChannels(conf config.GB28181Config, list ...ChannelInfo) {
+func (d *Device) UpdateChannels(list ...ChannelInfo) {
 	for _, c := range list {
 		//当父设备非空且存在时、父设备节点增加通道
 		if c.ParentId != "" {
@@ -103,6 +104,7 @@ func (d *Device) addOrUpdateChannel(info ChannelInfo) (c *Channel) {
 		c = &Channel{
 			device:      d,
 			ChannelInfo: info,
+			conf:        d.conf,
 		}
 		c.WithMediaServer(d.observer)
 		d.channelMap.Store(info.ChannelId, c)
@@ -281,7 +283,7 @@ func (d *Device) UpdateChannelStatus(deviceList []*notifyMessage, conf config.GB
 				Longitude:    v.Longitude,
 				Latitude:     v.Latitude,
 			}
-			d.UpdateChannels(conf, channel)
+			d.UpdateChannels(channel)
 		}
 	}
 }

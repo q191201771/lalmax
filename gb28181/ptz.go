@@ -13,11 +13,12 @@ type MessagePtz struct {
 	PTZCmd   string   `xml:"PTZCmd"`
 }
 
+const DeviceControl = "DeviceControl"
 const PTZFirstByte = 0xA5
 const (
-	PresetSet = 0x81
-	PresetTo  = 0x82
-	PresetDel = 0x83
+	PresetSet  = 0x81
+	PresetCall = 0x82
+	PresetDel  = 0x83
 )
 
 const (
@@ -110,9 +111,9 @@ func (p *Ptz) Pack() string {
 	if p.Right {
 		buf[3] |= 1
 	}
-	buf[4] = p.Speed * 32
-	buf[5] = p.Speed * 32
-	buf[6] = p.Speed * 2
+	buf[4] = p.Speed
+	buf[5] = p.Speed
+	buf[6] = p.Speed
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
 }
@@ -164,8 +165,8 @@ func (f *Fi) Pack() string {
 		buf[3] |= 1
 	}
 
-	buf[4] = f.Speed * 32
-	buf[5] = f.Speed * 32
+	buf[4] = f.Speed
+	buf[5] = f.Speed
 	buf[6] = 0
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
@@ -173,7 +174,7 @@ func (f *Fi) Pack() string {
 
 type Preset struct {
 	CMD   byte
-	Value byte
+	Point byte
 }
 
 func (p *Preset) Pack() string {
@@ -185,7 +186,7 @@ func (p *Preset) Pack() string {
 	buf[3] = p.CMD
 
 	buf[4] = 0
-	buf[5] = p.Value
+	buf[5] = p.Point
 	buf[6] = 0
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)

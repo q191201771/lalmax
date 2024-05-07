@@ -51,6 +51,11 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 	router.POST("/api/gb/stop_play", gbLogic.StopPlay)
 	router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
 	router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
+	router.POST("/api/gb/ptz_direction", gbLogic.PtzDirection)
+	router.POST("/api/gb/ptz_zoom", gbLogic.PtzZoom)
+	router.POST("/api/gb/ptz_fi", gbLogic.PtzFi)
+	router.POST("/api/gb/ptz_preset", gbLogic.PtzPreset)
+	router.POST("/api/gb/ptz_stop", gbLogic.PtzStop)
 
 	auth := Authentication(s.conf.HttpConfig.CtrlAuthWhitelist.Secrets, s.conf.HttpConfig.CtrlAuthWhitelist.IPs)
 	// stat

@@ -3,6 +3,7 @@ package gb28181
 import (
 	"errors"
 	"fmt"
+	"github.com/q191201771/naza/pkg/nazaatomic"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,6 +27,7 @@ type Channel struct {
 	playInfo *PlayInfo
 
 	ChannelInfo
+	conf config.GB28181Config
 }
 
 // Channel 通道
@@ -49,6 +51,7 @@ type ChannelInfo struct {
 	StreamName   string        `xml:"-"`
 	serial       string
 	mediaserver.MediaInfo
+	sn nazaatomic.Uint32
 }
 
 type ChannelStatus string
@@ -62,9 +65,9 @@ func (channel *Channel) WithMediaServer(observer IMediaOpObserver) {
 	channel.observer = observer
 }
 
-func (channel *Channel) TryAutoInvite(opt *InviteOptions, conf config.GB28181Config, streamName string, playInfo *PlayInfo) {
+func (channel *Channel) TryAutoInvite(opt *InviteOptions, streamName string, playInfo *PlayInfo) {
 	if channel.CanInvite(streamName) {
-		go channel.Invite(opt, conf, streamName, playInfo)
+		go channel.Invite(opt, streamName, playInfo)
 	}
 }
 
@@ -139,7 +142,7 @@ f字段中视、音频参数段之间不需空格分割。
 可使用f字段中的分辨率参数标识同一设备不同分辨率的码流。
 */
 
-func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, streamName string, playInfo *PlayInfo) (code int, err error) {
+func (channel *Channel) Invite(opt *InviteOptions, streamName string, playInfo *PlayInfo) (code int, err error) {
 	d := channel.device
 	s := "Play"
 
@@ -185,7 +188,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 		sdpInfo = append(sdpInfo, "a=setup:passive", "a=connection:new")
 	}
 
-	invite := channel.CreateRequst(sip.INVITE, conf)
+	invite := channel.CreateRequst(sip.INVITE, channel.conf)
 	contentType := sip.ContentType("application/sdp")
 	invite.AppendHeader(&contentType)
 
@@ -195,7 +198,7 @@ func (channel *Channel) Invite(opt *InviteOptions, conf config.GB28181Config, st
 	invite.SetBody(strings.Join(sdpInfo, "\r\n")+"\r\n", true)
 
 	subject := sip.GenericHeader{
-		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.ChannelId, opt.ssrc, conf.Serial),
+		HeaderName: "Subject", Contents: fmt.Sprintf("%s:%s,%s:0", channel.ChannelId, opt.ssrc, channel.conf.Serial),
 	}
 	invite.AppendHeader(&subject)
 	inviteRes, err := d.SipRequestForResponse(invite)
@@ -286,7 +289,6 @@ func (channel *Channel) Bye(streamName string) (err error) {
 	} else {
 		return errors.New("channel has been closed")
 	}
-
 }
 func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB28181Config) (req sip.Request) {
 	d := channel.device
@@ -344,4 +346,123 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 	req.SetTransport(conf.SipNetwork)
 	req.SetDestination(d.NetAddr)
 	return req
+}
+func (channel *Channel) PtzDirection(direction *PtzDirection) error {
+	ptz := Ptz{
+		ZoomOut: false,
+		ZoomIn:  false,
+		Up:      direction.Up,
+		Down:    direction.Down,
+		Left:    direction.Left,
+		Right:   direction.Right,
+		Speed:   direction.Speed,
+	}
+	msgPtz := &MessagePtz{
+		CmdType:  DeviceControl,
+		DeviceID: direction.ChannelId,
+		SN:       int(channel.sn.Add(1)),
+		PTZCmd:   ptz.Pack(),
+	}
+	xml, err := XmlEncode(msgPtz)
+	if err != nil {
+		return err
+	}
+	return channel.sipMessage(xml)
+}
+func (channel *Channel) PtzZoom(zoom *PtzZoom) error {
+	ptz := Ptz{
+		ZoomOut: zoom.ZoomOut,
+		ZoomIn:  zoom.ZoomIn,
+		Speed:   zoom.Speed,
+	}
+	msgPtz := &MessagePtz{
+		CmdType:  DeviceControl,
+		DeviceID: zoom.ChannelId,
+		SN:       int(channel.sn.Add(1)),
+		PTZCmd:   ptz.Pack(),
+	}
+	xml, err := XmlEncode(msgPtz)
+	if err != nil {
+		return err
+	}
+	return channel.sipMessage(xml)
+}
+func (channel *Channel) PtzFi(fi *PtzFi) error {
+	ptzFi := Fi{
+		IrisIn:    fi.IrisIn,
+		IrisOut:   fi.IrisOut,
+		FocusNear: fi.FocusNear,
+		FocusFar:  fi.FocusFar,
+		Speed:     fi.Speed,
+	}
+	msgPtz := &MessagePtz{
+		CmdType:  DeviceControl,
+		DeviceID: fi.ChannelId,
+		SN:       int(channel.sn.Add(1)),
+		PTZCmd:   ptzFi.Pack(),
+	}
+	xml, err := XmlEncode(msgPtz)
+	if err != nil {
+		return err
+	}
+	return channel.sipMessage(xml)
+}
+func (channel *Channel) PtzPreset(ptzPreset *PtzPreset) error {
+	cmd := byte(PresetSet)
+	switch ptzPreset.Cmd {
+	case PresetEditPoint:
+		cmd = PresetSet
+	case PresetDelPoint:
+		cmd = PresetDel
+	case PresetCallPoint:
+		cmd = PresetCall
+	default:
+		return errors.New(fmt.Sprintf("ptz preset cmd error:%d", ptzPreset.Cmd))
+	}
+	preset := Preset{
+		CMD:   cmd,
+		Point: ptzPreset.Point,
+	}
+	msgPtz := &MessagePtz{
+		CmdType:  DeviceControl,
+		DeviceID: ptzPreset.ChannelId,
+		SN:       int(channel.sn.Add(1)),
+		PTZCmd:   preset.Pack(),
+	}
+	xml, err := XmlEncode(msgPtz)
+	if err != nil {
+		return err
+	}
+	return channel.sipMessage(xml)
+}
+func (channel *Channel) PtzStop(stop *PtzStop) error {
+	ptz := Ptz{}
+	msgPtz := &MessagePtz{
+		CmdType:  DeviceControl,
+		DeviceID: stop.ChannelId,
+		SN:       int(channel.sn.Add(1)),
+		PTZCmd:   ptz.Pack(),
+	}
+	xml, err := XmlEncode(msgPtz)
+	if err != nil {
+		return err
+	}
+	return channel.sipMessage(xml)
+}
+func (channel *Channel) sipMessage(xml string) error {
+	d := channel.device
+	msg := channel.CreateRequst(sip.MESSAGE, channel.conf)
+	msg.AppendHeader(&sip.GenericHeader{HeaderName: "Content-Type", Contents: "Application/MANSCDP+xml"})
+	msg.SetBody(xml, true)
+	msgRes, err := d.SipRequestForResponse(msg)
+	if err != nil {
+		return err
+	}
+
+	code := int(msgRes.StatusCode())
+	if code == http.StatusOK {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("sip message ptz fail,code:%d", code))
+	}
 }
