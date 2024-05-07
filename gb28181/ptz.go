@@ -111,9 +111,9 @@ func (p *Ptz) Pack() string {
 	if p.Right {
 		buf[3] |= 1
 	}
-	buf[4] = p.Speed * 32
-	buf[5] = p.Speed * 32
-	buf[6] = p.Speed * 2
+	buf[4] = p.Speed
+	buf[5] = p.Speed
+	buf[6] = p.Speed
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
 }
@@ -165,8 +165,8 @@ func (f *Fi) Pack() string {
 		buf[3] |= 1
 	}
 
-	buf[4] = f.Speed * 32
-	buf[5] = f.Speed * 32
+	buf[4] = f.Speed
+	buf[5] = f.Speed
 	buf[6] = 0
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
