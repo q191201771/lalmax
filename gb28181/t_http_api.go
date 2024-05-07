@@ -42,6 +42,50 @@ type RespPlay struct {
 type ReqStop struct {
 	PlayInfo
 }
+
+type PtzDirection struct {
+	DeviceId  string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
+	Up        bool   `json:"up" form:"up" url:"up"`
+	Down      bool   `json:"down" form:"down" url:"down"`
+	Left      bool   `json:"left" form:"left" url:"left"`
+	Right     bool   `json:"right" form:"right" url:"right"`
+	Speed     byte   `json:"speed" form:"speed" url:"speed"` //0-8
+}
+type PtzZoom struct {
+	DeviceId  string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
+	ZoomOut   bool   `json:"zoom_out" form:"zoom_out" url:"zoom_out"`
+	ZoomIn    bool   `json:"zoom_in" form:"zoom_in" url:"zoom_in"`
+	Speed     byte   `json:"speed" form:"speed" url:"speed"` //0-8
+}
+type PtzFi struct {
+	DeviceId  string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
+	IrisIn    bool   `json:"iris_in" form:"iris_in" url:"iris_in"`
+	IrisOut   bool   `json:"iris_out" form:"iris_out" url:"iris_out"`
+	FocusNear bool   `json:"focus_near" form:"focus_near" url:"focus_near"`
+	FocusFar  bool   `json:"focus_far" form:"focus_far" url:"focus_far"`
+	Speed     byte   `json:"speed" form:"speed" url:"speed"` //0-8
+}
+type PresetCmd byte
+
+const (
+	PresetEditPoint PresetCmd = iota
+	PresetDelPoint
+	PresetCallPoint
+)
+
+type PtzPreset struct {
+	DeviceId  string    `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId string    `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
+	Cmd       PresetCmd `json:"cmd" form:"cmd" url:"cmd"`
+	Point     byte      `json:"point" form:"point" url:"point"`
+}
+type PtzStop struct {
+	DeviceId  string `json:"device_id" form:"device_id" url:"device_id"`    // 设备 Id
+	ChannelId string `json:"channel_id" form:"channel_id" url:"channel_id"` // channel id
+}
 type ReqUpdateNotify struct {
 	DeviceId string `json:"device_id" form:"device_id" url:"device_id"` //设备 Id
 }
@@ -79,6 +123,11 @@ var codeMsgMap = map[ResCode]string{
 	CodeDeviceNotRegister: "设备暂时未注册",
 	CodeDeviceStopError:   "设备停止播放错误",
 }
+
+const (
+	SpeedParamError = "speed 范围(0,8]"
+	PointParamError = "point 范围(0,50]"
+)
 
 func (c ResCode) Msg() string {
 	msg, ok := codeMsgMap[c]

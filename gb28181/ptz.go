@@ -13,11 +13,12 @@ type MessagePtz struct {
 	PTZCmd   string   `xml:"PTZCmd"`
 }
 
+const DeviceControl = "DeviceControl"
 const PTZFirstByte = 0xA5
 const (
-	PresetSet = 0x81
-	PresetTo  = 0x82
-	PresetDel = 0x83
+	PresetSet  = 0x81
+	PresetCall = 0x82
+	PresetDel  = 0x83
 )
 
 const (
@@ -173,7 +174,7 @@ func (f *Fi) Pack() string {
 
 type Preset struct {
 	CMD   byte
-	Value byte
+	Point byte
 }
 
 func (p *Preset) Pack() string {
@@ -185,7 +186,7 @@ func (p *Preset) Pack() string {
 	buf[3] = p.CMD
 
 	buf[4] = 0
-	buf[5] = p.Value
+	buf[5] = p.Point
 	buf[6] = 0
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)

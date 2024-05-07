@@ -414,14 +414,14 @@ func (s *GB28181Server) getDeviceInfos() (deviceInfos *DeviceInfos) {
 func (s *GB28181Server) GetAllSyncChannels() {
 	Devices.Range(func(key, value any) bool {
 		d := value.(*Device)
-		d.syncChannels(s.conf)
+		d.syncChannels()
 		return true
 	})
 }
 func (s *GB28181Server) GetSyncChannels(deviceId string) bool {
 	if v, ok := Devices.Load(deviceId); ok {
 		d := v.(*Device)
-		d.syncChannels(s.conf)
+		d.syncChannels()
 		return true
 	} else {
 		return false
@@ -542,7 +542,7 @@ func (s *GB28181Server) OnRegister(req sip.Request, tx sip.ServerTransaction) {
 
 		if !isUnregister {
 			//订阅设备更新
-			go d.syncChannels(s.conf)
+			go d.syncChannels()
 		}
 	} else {
 		nazalog.Info("OnRegister unauthorized, id:", id, " source:", req.Source(), " destination:", req.Destination())
@@ -607,7 +607,7 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 			//	go d.syncChannels(s.conf)
 			//}
 		case "Catalog":
-			d.UpdateChannels(s.conf, temp.DeviceList...)
+			d.UpdateChannels(temp.DeviceList...)
 		case "DeviceInfo":
 			// 主设备信息
 			d.Name = temp.DeviceName
@@ -631,7 +631,7 @@ func (s *GB28181Server) OnMessage(req sip.Request, tx sip.ServerTransaction) {
 				d := s.StoreDevice(id, req)
 				d.LastKeepaliveAt = time.Now()
 				tx.Respond(sip.NewResponseFromRequest("", req, http.StatusOK, "OK", ""))
-				go d.syncChannels(s.conf)
+				go d.syncChannels()
 				return
 			}
 		}
@@ -734,6 +734,7 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 			sipIP:        sipIp,
 			mediaIP:      mediaIp,
 			NetAddr:      deviceIp,
+			conf:         s.conf,
 		}
 		d.WithMediaServer(s)
 		nazalog.Info("StoreDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
