@@ -99,9 +99,9 @@ func (s *SrtServer) Run(ctx context.Context) {
 		}
 
 		if info.Mode == srt.PUBLISH {
-			go s.handlePublish(ctx, conn, info.Appname)
+			go s.handlePublish(ctx, conn, info.StreamName)
 		} else {
-			go s.handleSubcribe(ctx, conn, info.Appname)
+			go s.handleSubcribe(ctx, conn, info.StreamName)
 		}
 	}
 }
@@ -133,7 +133,7 @@ func (s *SrtServer) Remove(host string, ss logic.ICustomizePubSessionContext) {
 }
 
 type StreamInfo struct {
-	Appname string
+	StreamName string
 	Mode    srt.ConnType
 }
 
@@ -149,7 +149,7 @@ func getStreamInfo(streamid string) StreamInfo {
 		name := ss[0]
 		switch name {
 		case "h":
-			info.Appname = ss[1]
+			info.StreamName = ss[1]
 		case "m":
 			switch ss[1] {
 			case "publish":
