@@ -76,10 +76,10 @@ https://pengrl.com/lal/#/streamurllist
 
 ```
 推流url
-srt://127.0.0.1:6001?streamid=publish:test110
+srt://127.0.0.1:6001?streamid=#!::h=test110,m=publish
 
 拉流url
-srt://127.0.0.1:6001?streamid=test110
+srt://127.0.0.1:6001?streamid=#!::h=test110,m=request
 ```
 
 ## [WebRTC](./document/rtc.md)
