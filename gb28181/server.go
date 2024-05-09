@@ -209,7 +209,7 @@ func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, devi
 					nazalog.Error("gb28181 media server udp acquire failed:%s", err.Error())
 					return nil
 				}
-				mediaKey = fmt.Sprintf("%s%d", "tcp", port)
+				mediaKey = fmt.Sprintf("%s%d", "udp", port)
 			}
 			mediasvr = mediaserver.NewGB28181MediaServer(int(port), mediaKey, s, s.lalServer)
 			s.MediaServerMap.Store(fmt.Sprintf("%s%s", deviceId, channelId), mediasvr)
