@@ -82,12 +82,10 @@ func (s *SrtServer) Run(ctx context.Context) {
 
 		}
 
-		var streamid string
+		var info StreamInfo
 		conn, mode, err := srtlistener.Accept(func(req srt.ConnRequest) srt.ConnType {
-			streamid = req.StreamId()
-
-			// currently it's the same to return SUBSCRIBE or PUBLISH
-			return srt.SUBSCRIBE
+			info = getStreamInfo(req.StreamId())
+			return info.Mode
 		})
 
 		if err != nil {
@@ -100,14 +98,10 @@ func (s *SrtServer) Run(ctx context.Context) {
 			continue
 		}
 
-		// gosrt的mode不好用
-		if strings.HasPrefix(streamid, "publish:") {
-			// 推流模式
-			streamid = strings.TrimLeft(streamid, "publish:")
-			go s.handlePublish(ctx, conn, streamid)
+		if info.Mode == srt.PUBLISH {
+			go s.handlePublish(ctx, conn, info.StreamName)
 		} else {
-			// 拉流模式
-			go s.handleSubcribe(ctx, conn, streamid)
+			go s.handleSubcribe(ctx, conn, info.StreamName)
 		}
 	}
 }
@@ -136,4 +130,35 @@ func (s *SrtServer) handleSubcribe(ctx context.Context, conn srt.Conn, streamid 
 
 func (s *SrtServer) Remove(host string, ss logic.ICustomizePubSessionContext) {
 	s.lalServer.DelCustomizePubSession(ss)
+}
+
+type StreamInfo struct {
+	StreamName string
+	Mode    srt.ConnType
+}
+
+func getStreamInfo(streamid string) StreamInfo {
+	info := StreamInfo{
+		Mode: srt.REJECT,
+	}
+
+	s := strings.TrimLeft(streamid, "#!::")
+	values := strings.Split(s, ",")
+	for _, v := range values {
+		ss := strings.Split(v, "=")
+		name := ss[0]
+		switch name {
+		case "h":
+			info.StreamName = ss[1]
+		case "m":
+			switch ss[1] {
+			case "publish":
+				info.Mode = srt.PUBLISH
+			case "request":
+				info.Mode = srt.SUBSCRIBE
+			}
+		}
+	}
+
+	return info
 }
