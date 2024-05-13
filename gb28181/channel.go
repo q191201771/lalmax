@@ -3,11 +3,12 @@ package gb28181
 import (
 	"errors"
 	"fmt"
-	"github.com/q191201771/naza/pkg/nazaatomic"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/q191201771/naza/pkg/nazaatomic"
 
 	config "github.com/q191201771/lalmax/conf"
 	"github.com/q191201771/lalmax/gb28181/mediaserver"
@@ -204,6 +205,16 @@ func (channel *Channel) Invite(opt *InviteOptions, streamName string, playInfo *
 	inviteRes, err := d.SipRequestForResponse(invite)
 	if err != nil {
 		nazalog.Error("invite failed, err:", err, " invite msg:", invite.String())
+
+		//jay 在media端口监听成功后，但是sip发送失败时
+		if !playInfo.SinglePort {
+			if channel.observer != nil {
+				if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
+					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
+				}
+			}
+		}
+
 		return http.StatusInternalServerError, err
 	}
 	code = int(inviteRes.StatusCode())
