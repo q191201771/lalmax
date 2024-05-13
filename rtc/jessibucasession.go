@@ -3,6 +3,7 @@ package rtc
 import (
 	"context"
 	"math"
+	"sync"
 
 	"github.com/gofrs/uuid"
 	"github.com/pion/webrtc/v3"
@@ -29,6 +30,8 @@ type jessibucaSession struct {
 	remoteSafari bool
 	DC           *webrtc.DataChannel
 	streamId     string
+	cancel       context.CancelFunc
+	stopOne      sync.Once
 }
 
 func NewJessibucaSession(streamid string, writeChanSize int, pc *peerConnection, lalServer logic.ILalServer) *jessibucaSession {
@@ -39,14 +42,16 @@ func NewJessibucaSession(streamid string, writeChanSize int, pc *peerConnection,
 	}
 
 	u, _ := uuid.NewV4()
+	ctx, cancel := context.WithCancel(context.Background())
 	return &jessibucaSession{
 		hooks:        session,
 		pc:           pc,
 		lalServer:    lalServer,
 		subscriberId: u.String(),
 		streamId:     streamid,
-		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](context.Background(), writeChanSize),
-		closeChan:    make(chan bool, 2),
+		cancel:       cancel,
+		msgChan:      chanx.NewUnboundedChan[base.RtmpMsg](ctx, writeChanSize),
+		closeChan:    make(chan bool, 1),
 	}
 }
 func (conn *jessibucaSession) createDataChannel() {
@@ -110,11 +115,12 @@ func (conn *jessibucaSession) Run() {
 				}
 
 				defer func() {
+					nazalog.Info("RemoveConsumer, connid:", conn.subscriberId)
+					conn.hooks.RemoveConsumer(conn.subscriberId)
 					conn.DC.Close()
 					conn.pc.Close()
 					conn.DC = nil
-					nazalog.Info("RemoveConsumer, connid:", conn.subscriberId)
-					conn.hooks.RemoveConsumer(conn.subscriberId)
+					conn.cancel()
 				}()
 				for {
 					select {
@@ -173,5 +179,7 @@ func (conn *jessibucaSession) OnMsg(msg base.RtmpMsg) {
 }
 
 func (conn *jessibucaSession) OnStop() {
-	conn.closeChan <- true
+	conn.stopOne.Do(func() {
+		conn.closeChan <- true
+	})
 }
