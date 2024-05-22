@@ -48,8 +48,9 @@ func NewPSDemuxer() *PSDemuxer {
 	}
 	//兼容没有发送psm的ps包
 	streamH264 := newpsstream(uint8(PES_STREAM_VIDEO), PS_STREAM_H264)
+	streamG711A := newpsstream(uint8(PES_STREAM_AUDIO), PS_STREAM_G711A)
 	psdemuxer.streamMap[streamH264.sid] = streamH264
-
+	psdemuxer.streamMap[streamG711A.sid] = streamG711A
 	return psdemuxer
 }
 
