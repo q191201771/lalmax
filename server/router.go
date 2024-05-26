@@ -22,18 +22,19 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 		return
 	}
 	router.Use(s.Cors())
-	// whip
-	router.POST("/whip", s.HandleWHIP)
-	router.OPTIONS("/whip", s.HandleWHIP)
-	router.DELETE("/whip", s.HandleWHIP)
 
+	rtc := router.Group("/webrtc")
+	// whip
+	rtc.POST("/whip", s.HandleWHIP)
+	rtc.OPTIONS("/whip", s.HandleWHIP)
+	rtc.DELETE("/whip", s.HandleWHIP)
 	// whep
-	router.POST("/whep", s.HandleWHEP)
-	router.OPTIONS("/whep", s.HandleWHEP)
-	router.DELETE("/whep", s.HandleWHEP)
+	rtc.POST("/whep", s.HandleWHEP)
+	rtc.OPTIONS("/whep", s.HandleWHEP)
+	rtc.DELETE("/whep", s.HandleWHEP)
 	// Jessibuca flv封装play
-	router.POST("/webrtc/play/live/:streamid", s.HandleJessibuca)
-	router.DELETE("/webrtc/play/live/:streamid", s.HandleJessibuca)
+	rtc.POST("/play/live/:streamid", s.HandleJessibuca)
+	rtc.DELETE("/play/live/:streamid", s.HandleJessibuca)
 
 	// http-fmp4
 	router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
