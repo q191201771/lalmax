@@ -33,7 +33,7 @@ type Conn struct {
 	conn       net.Conn
 	r          io.Reader
 	check      bool
-	demuxer    *mpegps.PSDemuxer
+	demuxer    *mpegps.PsDemuxer
 	streamName string
 	lalServer  logic.ILalServer
 	lalSession logic.ICustomizePubSessionContext
@@ -55,7 +55,7 @@ func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
 	c := &Conn{
 		conn:      conn,
 		r:         conn,
-		demuxer:   mpegps.NewPSDemuxer(),
+		demuxer:   mpegps.NewPsDemuxer(),
 		observer:  observer,
 		lalServer: lal,
 		buffer:    bytes.NewBuffer(nil),
@@ -200,7 +200,7 @@ func (c *Conn) Demuxer(data []byte) error {
 	return nil
 }
 
-func (c *Conn) OnFrame(frame []byte, cid mpegps.PS_STREAM_TYPE, pts uint64, dts uint64) {
+func (c *Conn) OnFrame(frame []byte, cid mpegps.PsStreamType, pts uint64, dts uint64) {
 	payloadType := getPayloadType(cid)
 	if payloadType == base.AvPacketPtUnknown {
 		return
@@ -254,17 +254,17 @@ func (c *Conn) OnFrame(frame []byte, cid mpegps.PS_STREAM_TYPE, pts uint64, dts 
 	}
 }
 
-func getPayloadType(cid mpegps.PS_STREAM_TYPE) base.AvPacketPt {
+func getPayloadType(cid mpegps.PsStreamType) base.AvPacketPt {
 	switch cid {
-	case mpegps.PS_STREAM_AAC:
+	case mpegps.PsStreamAac:
 		return base.AvPacketPtAac
-	case mpegps.PS_STREAM_G711A:
+	case mpegps.PsStreamG711A:
 		return base.AvPacketPtG711A
-	case mpegps.PS_STREAM_G711U:
+	case mpegps.PsStreamG711U:
 		return base.AvPacketPtG711U
-	case mpegps.PS_STREAM_H264:
+	case mpegps.PsStreamH264:
 		return base.AvPacketPtAvc
-	case mpegps.PS_STREAM_H265:
+	case mpegps.PsStreamH265:
 		return base.AvPacketPtHevc
 	}
 

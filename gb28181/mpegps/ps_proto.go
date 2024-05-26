@@ -40,15 +40,15 @@ func (e *sidNotFoundError) NeedMore() bool         { return false }
 func (e *sidNotFoundError) ParserError() bool      { return false }
 func (e *sidNotFoundError) StreamIdNotFound() bool { return true }
 
-type PS_STREAM_TYPE int
+type PsStreamType int
 
 const (
-	PS_STREAM_UNKNOW PS_STREAM_TYPE = 0xFF
-	PS_STREAM_AAC    PS_STREAM_TYPE = 0x0F
-	PS_STREAM_H264   PS_STREAM_TYPE = 0x1B
-	PS_STREAM_H265   PS_STREAM_TYPE = 0x24
-	PS_STREAM_G711A  PS_STREAM_TYPE = 0x90
-	PS_STREAM_G711U  PS_STREAM_TYPE = 0x91
+	PsStreamUnknow PsStreamType = 0xFF
+	PsStreamAac    PsStreamType = 0x0F
+	PsStreamH264   PsStreamType = 0x1B
+	PsStreamH265   PsStreamType = 0x24
+	PsStreamG711A  PsStreamType = 0x90
+	PsStreamG711U  PsStreamType = 0x91
 )
 
 // Table 2-33 – Program Stream pack header
@@ -71,28 +71,28 @@ const (
 //     for (i = 0; i < pack_stuffing_length; i++) {
 //             stuffing_byte                               8       bslbf
 //     }
-//     if (nextbits() == system_header_start_code) {
-//             system_header ()
+//     if (nextbits() == SystemHeader_start_code) {
+//             SystemHeader ()
 //     }
 // }
 
-type PSPackHeader struct {
-	IsMpeg1                          bool
-	System_clock_reference_base      uint64 //33 bits
-	System_clock_reference_extension uint16 //9 bits
-	Program_mux_rate                 uint32 //22 bits
-	Pack_stuffing_length             uint8  //3 bitss
+type PsPackHeader struct {
+	IsMpeg1                       bool
+	SystemClockReferenceBase      uint64 //33 bits
+	SystemClockReferenceExtension uint16 //9 bits
+	ProgramMuxRate                uint32 //22 bits
+	PackStuffingLength            uint8  //3 bitss
 }
 
-func (ps_pkg_hdr *PSPackHeader) PrettyPrint(file *os.File) {
-	file.WriteString(fmt.Sprintf("IsMpeg1:%t\n", ps_pkg_hdr.IsMpeg1))
-	file.WriteString(fmt.Sprintf("System_clock_reference_base:%d\n", ps_pkg_hdr.System_clock_reference_base))
-	file.WriteString(fmt.Sprintf("System_clock_reference_extension:%d\n", ps_pkg_hdr.System_clock_reference_extension))
-	file.WriteString(fmt.Sprintf("Program_mux_rate:%d\n", ps_pkg_hdr.Program_mux_rate))
-	file.WriteString(fmt.Sprintf("Pack_stuffing_length:%d\n", ps_pkg_hdr.Pack_stuffing_length))
+func (psPackHeader *PsPackHeader) PrettyPrint(file *os.File) {
+	file.WriteString(fmt.Sprintf("IsMpeg1:%t\n", psPackHeader.IsMpeg1))
+	file.WriteString(fmt.Sprintf("system clock reference base:%d\n", psPackHeader.SystemClockReferenceBase))
+	file.WriteString(fmt.Sprintf("system clock reference extension:%d\n", psPackHeader.SystemClockReferenceExtension))
+	file.WriteString(fmt.Sprintf("program mux rate:%d\n", psPackHeader.ProgramMuxRate))
+	file.WriteString(fmt.Sprintf("pack stuffing length:%d\n", psPackHeader.PackStuffingLength))
 }
 
-func (ps_pkg_hdr *PSPackHeader) Decode(bs *BitStream) error {
+func (psPackHeader *PsPackHeader) Decode(bs *BitStream) error {
 	if bs.RemainBytes() < 5 {
 		return errNeedMore
 	}
@@ -104,90 +104,90 @@ func (ps_pkg_hdr *PSPackHeader) Decode(bs *BitStream) error {
 		if bs.RemainBytes() < 10 {
 			return errNeedMore
 		}
-		return ps_pkg_hdr.decodeMpeg2(bs)
+		return psPackHeader.decodeMpeg2(bs)
 	} else if bs.NextBits(4) == 0x02 { //mpeg1
 		if bs.RemainBytes() < 8 {
 			return errNeedMore
 		}
-		ps_pkg_hdr.IsMpeg1 = true
-		return ps_pkg_hdr.decodeMpeg1(bs)
+		psPackHeader.IsMpeg1 = true
+		return psPackHeader.decodeMpeg1(bs)
 	} else {
 		return errParser
 	}
 }
 
-func (ps_pkg_hdr *PSPackHeader) decodeMpeg2(bs *BitStream) error {
+func (psPackHeader *PsPackHeader) decodeMpeg2(bs *BitStream) error {
 	bs.SkipBits(2)
-	ps_pkg_hdr.System_clock_reference_base = bs.GetBits(3)
+	psPackHeader.SystemClockReferenceBase = bs.GetBits(3)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_base = ps_pkg_hdr.System_clock_reference_base<<15 | bs.GetBits(15)
+	psPackHeader.SystemClockReferenceBase = psPackHeader.SystemClockReferenceBase<<15 | bs.GetBits(15)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_base = ps_pkg_hdr.System_clock_reference_base<<15 | bs.GetBits(15)
+	psPackHeader.SystemClockReferenceBase = psPackHeader.SystemClockReferenceBase<<15 | bs.GetBits(15)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_extension = bs.Uint16(9)
+	psPackHeader.SystemClockReferenceExtension = bs.Uint16(9)
 	bs.SkipBits(1)
-	ps_pkg_hdr.Program_mux_rate = bs.Uint32(22)
+	psPackHeader.ProgramMuxRate = bs.Uint32(22)
 	bs.SkipBits(1)
 	bs.SkipBits(1)
 	bs.SkipBits(5)
-	ps_pkg_hdr.Pack_stuffing_length = bs.Uint8(3)
-	if bs.RemainBytes() < int(ps_pkg_hdr.Pack_stuffing_length) {
+	psPackHeader.PackStuffingLength = bs.Uint8(3)
+	if bs.RemainBytes() < int(psPackHeader.PackStuffingLength) {
 		bs.UnRead(10 * 8)
 		return errNeedMore
 	}
-	bs.SkipBits(int(ps_pkg_hdr.Pack_stuffing_length) * 8)
+	bs.SkipBits(int(psPackHeader.PackStuffingLength) * 8)
 	return nil
 }
 
-func (ps_pkg_hdr *PSPackHeader) decodeMpeg1(bs *BitStream) error {
+func (psPackHeader *PsPackHeader) decodeMpeg1(bs *BitStream) error {
 	bs.SkipBits(4)
-	ps_pkg_hdr.System_clock_reference_base = bs.GetBits(3)
+	psPackHeader.SystemClockReferenceBase = bs.GetBits(3)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_base = ps_pkg_hdr.System_clock_reference_base<<15 | bs.GetBits(15)
+	psPackHeader.SystemClockReferenceBase = psPackHeader.SystemClockReferenceBase<<15 | bs.GetBits(15)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_base = ps_pkg_hdr.System_clock_reference_base<<15 | bs.GetBits(15)
+	psPackHeader.SystemClockReferenceBase = psPackHeader.SystemClockReferenceBase<<15 | bs.GetBits(15)
 	bs.SkipBits(1)
-	ps_pkg_hdr.System_clock_reference_extension = 1
-	ps_pkg_hdr.Program_mux_rate = bs.Uint32(7)
+	psPackHeader.SystemClockReferenceExtension = 1
+	psPackHeader.ProgramMuxRate = bs.Uint32(7)
 	bs.SkipBits(1)
-	ps_pkg_hdr.Program_mux_rate = ps_pkg_hdr.Program_mux_rate<<15 | bs.Uint32(15)
+	psPackHeader.ProgramMuxRate = psPackHeader.ProgramMuxRate<<15 | bs.Uint32(15)
 	bs.SkipBits(1)
 	return nil
 }
 
-func (ps_pkg_hdr *PSPackHeader) Encode(bsw *BitStreamWriter) {
+func (psPackHeader *PsPackHeader) Encode(bsw *BitStreamWriter) {
 	bsw.PutBytes([]byte{0x00, 0x00, 0x01, 0xBA})
 	bsw.PutUint8(1, 2)
-	bsw.PutUint64(ps_pkg_hdr.System_clock_reference_base>>30, 3)
+	bsw.PutUint64(psPackHeader.SystemClockReferenceBase>>30, 3)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint64(ps_pkg_hdr.System_clock_reference_base>>15, 15)
+	bsw.PutUint64(psPackHeader.SystemClockReferenceBase>>15, 15)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint64(ps_pkg_hdr.System_clock_reference_base, 15)
+	bsw.PutUint64(psPackHeader.SystemClockReferenceBase, 15)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint16(ps_pkg_hdr.System_clock_reference_extension, 9)
+	bsw.PutUint16(psPackHeader.SystemClockReferenceExtension, 9)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint32(ps_pkg_hdr.Program_mux_rate, 22)
+	bsw.PutUint32(psPackHeader.ProgramMuxRate, 22)
 	bsw.PutUint8(1, 1)
 	bsw.PutUint8(1, 1)
 	bsw.PutUint8(0x1F, 5)
-	bsw.PutUint8(ps_pkg_hdr.Pack_stuffing_length, 3)
-	bsw.PutRepetValue(0xFF, int(ps_pkg_hdr.Pack_stuffing_length))
+	bsw.PutUint8(psPackHeader.PackStuffingLength, 3)
+	bsw.PutRepetValue(0xFF, int(psPackHeader.PackStuffingLength))
 }
 
-type Elementary_Stream struct {
-	Stream_id                uint8
-	P_STD_buffer_bound_scale uint8
-	P_STD_buffer_size_bound  uint16
+type ElementaryStream struct {
+	StreamId             uint8
+	PStdBufferBoundScale uint8
+	PStdBufferSizeBound  uint16
 }
 
-func NewElementary_Stream(sid uint8) *Elementary_Stream {
-	return &Elementary_Stream{
-		Stream_id: sid,
+func NewElementaryStream(sid uint8) *ElementaryStream {
+	return &ElementaryStream{
+		StreamId: sid,
 	}
 }
 
-// system_header () {
-//     system_header_start_code         32 bslbf
+// SystemHeader () {
+//     SystemHeader_start_code         32 bslbf
 //     header_length                     16 uimsbf
 //     marker_bit                         1  bslbf
 //     rate_bound                         22 uimsbf
@@ -209,99 +209,99 @@ func NewElementary_Stream(sid uint8) *Elementary_Stream {
 //     }
 // }
 
-type System_header struct {
-	Header_length                uint16
-	Rate_bound                   uint32
-	Audio_bound                  uint8
-	Fixed_flag                   uint8
-	CSPS_flag                    uint8
-	System_audio_lock_flag       uint8
-	System_video_lock_flag       uint8
-	Video_bound                  uint8
-	Packet_rate_restriction_flag uint8
-	Streams                      []*Elementary_Stream
+type SystemHeader struct {
+	HeaderLength              uint16
+	RateBound                 uint32
+	AudioBound                uint8
+	FixedFlag                 uint8
+	CspsFlag                  uint8
+	SystemAudioLockFlag       uint8
+	SystemVideoLockFlag       uint8
+	VideoBound                uint8
+	PacketRateRestrictionFlag uint8
+	Streams                   []*ElementaryStream
 }
 
-func (sh *System_header) PrettyPrint(file *os.File) {
-	file.WriteString(fmt.Sprintf("Header_length:%d\n", sh.Header_length))
-	file.WriteString(fmt.Sprintf("Rate_bound:%d\n", sh.Rate_bound))
-	file.WriteString(fmt.Sprintf("Audio_bound:%d\n", sh.Audio_bound))
-	file.WriteString(fmt.Sprintf("Fixed_flag:%d\n", sh.Fixed_flag))
-	file.WriteString(fmt.Sprintf("CSPS_flag:%d\n", sh.CSPS_flag))
-	file.WriteString(fmt.Sprintf("System_audio_lock_flag:%d\n", sh.System_audio_lock_flag))
-	file.WriteString(fmt.Sprintf("System_video_lock_flag:%d\n", sh.System_video_lock_flag))
-	file.WriteString(fmt.Sprintf("Video_bound:%d\n", sh.Video_bound))
-	file.WriteString(fmt.Sprintf("Packet_rate_restriction_flag:%d\n", sh.Packet_rate_restriction_flag))
+func (sh *SystemHeader) PrettyPrint(file *os.File) {
+	file.WriteString(fmt.Sprintf("header length:%d\n", sh.HeaderLength))
+	file.WriteString(fmt.Sprintf("rate bound:%d\n", sh.RateBound))
+	file.WriteString(fmt.Sprintf("audio bound:%d\n", sh.AudioBound))
+	file.WriteString(fmt.Sprintf("fixed flag:%d\n", sh.FixedFlag))
+	file.WriteString(fmt.Sprintf("csps flag:%d\n", sh.CspsFlag))
+	file.WriteString(fmt.Sprintf("system audio lock flag:%d\n", sh.SystemAudioLockFlag))
+	file.WriteString(fmt.Sprintf("system video lock flag:%d\n", sh.SystemVideoLockFlag))
+	file.WriteString(fmt.Sprintf("video bound:%d\n", sh.VideoBound))
+	file.WriteString(fmt.Sprintf("packet rate restriction flag:%d\n", sh.PacketRateRestrictionFlag))
 	for i, es := range sh.Streams {
 		file.WriteString(fmt.Sprintf("----streams %d\n", i))
-		file.WriteString(fmt.Sprintf("    Stream_id:%d\n", es.Stream_id))
-		file.WriteString(fmt.Sprintf("    P_STD_buffer_bound_scale:%d\n", es.P_STD_buffer_bound_scale))
-		file.WriteString(fmt.Sprintf("    P_STD_buffer_size_bound:%d\n", es.P_STD_buffer_size_bound))
+		file.WriteString(fmt.Sprintf("    stream id:%d\n", es.StreamId))
+		file.WriteString(fmt.Sprintf("    PStdBufferBoundScale:%d\n", es.PStdBufferBoundScale))
+		file.WriteString(fmt.Sprintf("    PStdBufferSizeBound:%d\n", es.PStdBufferSizeBound))
 	}
 }
 
-func (sh *System_header) Encode(bsw *BitStreamWriter) {
+func (sh *SystemHeader) Encode(bsw *BitStreamWriter) {
 	bsw.PutBytes([]byte{0x00, 0x00, 0x01, 0xBB})
 	loc := bsw.ByteOffset()
 	bsw.PutUint16(0, 16)
 	bsw.Markdot()
 	bsw.PutUint8(1, 1)
-	bsw.PutUint32(sh.Rate_bound, 22)
+	bsw.PutUint32(sh.RateBound, 22)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint8(sh.Audio_bound, 6)
-	bsw.PutUint8(sh.Fixed_flag, 1)
-	bsw.PutUint8(sh.CSPS_flag, 1)
-	bsw.PutUint8(sh.System_audio_lock_flag, 1)
-	bsw.PutUint8(sh.System_video_lock_flag, 1)
+	bsw.PutUint8(sh.AudioBound, 6)
+	bsw.PutUint8(sh.FixedFlag, 1)
+	bsw.PutUint8(sh.CspsFlag, 1)
+	bsw.PutUint8(sh.SystemAudioLockFlag, 1)
+	bsw.PutUint8(sh.SystemVideoLockFlag, 1)
 	bsw.PutUint8(1, 1)
-	bsw.PutUint8(sh.Video_bound, 5)
-	bsw.PutUint8(sh.Packet_rate_restriction_flag, 1)
+	bsw.PutUint8(sh.VideoBound, 5)
+	bsw.PutUint8(sh.PacketRateRestrictionFlag, 1)
 	bsw.PutUint8(0x7F, 7)
 	for _, stream := range sh.Streams {
-		bsw.PutUint8(stream.Stream_id, 8)
+		bsw.PutUint8(stream.StreamId, 8)
 		bsw.PutUint8(3, 2)
-		bsw.PutUint8(stream.P_STD_buffer_bound_scale, 1)
-		bsw.PutUint16(stream.P_STD_buffer_size_bound, 13)
+		bsw.PutUint8(stream.PStdBufferBoundScale, 1)
+		bsw.PutUint16(stream.PStdBufferSizeBound, 13)
 	}
 	length := bsw.DistanceFromMarkDot() / 8
 	bsw.SetUint16(uint16(length), loc)
 }
 
-func (sh *System_header) Decode(bs *BitStream) error {
+func (sh *SystemHeader) Decode(bs *BitStream) error {
 	if bs.RemainBytes() < 12 {
 		return errNeedMore
 	}
 	if bs.Uint32(32) != 0x000001BB {
 		return errors.New("system header must start with 000001BB")
 	}
-	sh.Header_length = bs.Uint16(16)
-	if bs.RemainBytes() < int(sh.Header_length) {
+	sh.HeaderLength = bs.Uint16(16)
+	if bs.RemainBytes() < int(sh.HeaderLength) {
 		bs.UnRead(6 * 8)
 		return errNeedMore
 	}
-	if sh.Header_length < 6 || (sh.Header_length-6)%3 != 0 {
+	if sh.HeaderLength < 6 || (sh.HeaderLength-6)%3 != 0 {
 		return errParser
 	}
 	bs.SkipBits(1)
-	sh.Rate_bound = bs.Uint32(22)
+	sh.RateBound = bs.Uint32(22)
 	bs.SkipBits(1)
-	sh.Audio_bound = bs.Uint8(6)
-	sh.Fixed_flag = bs.Uint8(1)
-	sh.CSPS_flag = bs.Uint8(1)
-	sh.System_audio_lock_flag = bs.Uint8(1)
-	sh.System_video_lock_flag = bs.Uint8(1)
+	sh.AudioBound = bs.Uint8(6)
+	sh.FixedFlag = bs.Uint8(1)
+	sh.CspsFlag = bs.Uint8(1)
+	sh.SystemAudioLockFlag = bs.Uint8(1)
+	sh.SystemVideoLockFlag = bs.Uint8(1)
 	bs.SkipBits(1)
-	sh.Video_bound = bs.Uint8(5)
-	sh.Packet_rate_restriction_flag = bs.Uint8(1)
+	sh.VideoBound = bs.Uint8(5)
+	sh.PacketRateRestrictionFlag = bs.Uint8(1)
 	bs.SkipBits(7)
 	sh.Streams = sh.Streams[:0]
-	least := sh.Header_length - 6
+	least := sh.HeaderLength - 6
 	for least > 0 && bs.NextBits(1) == 0x01 {
-		es := new(Elementary_Stream)
-		es.Stream_id = bs.Uint8(8)
+		es := new(ElementaryStream)
+		es.StreamId = bs.Uint8(8)
 		bs.SkipBits(2)
-		es.P_STD_buffer_bound_scale = bs.GetBit()
-		es.P_STD_buffer_size_bound = bs.Uint16(13)
+		es.PStdBufferBoundScale = bs.GetBit()
+		es.PStdBufferSizeBound = bs.Uint16(13)
 		sh.Streams = append(sh.Streams, es)
 		least -= 3
 	}
@@ -311,16 +311,16 @@ func (sh *System_header) Decode(bs *BitStream) error {
 	return nil
 }
 
-type Elementary_stream_elem struct {
-	Stream_type                   uint8
-	Elementary_stream_id          uint8
-	Elementary_stream_info_length uint16
+type ElementaryStreamElem struct {
+	StreamType                 uint8
+	ElementaryStreamId         uint8
+	ElementaryStreamInfoLength uint16
 }
 
-func NewElementary_stream_elem(stype uint8, esid uint8) *Elementary_stream_elem {
-	return &Elementary_stream_elem{
-		Stream_type:          stype,
-		Elementary_stream_id: esid,
+func NewElementaryStreamElem(stype uint8, esid uint8) *ElementaryStreamElem {
+	return &ElementaryStreamElem{
+		StreamType:         stype,
+		ElementaryStreamId: esid,
 	}
 }
 
@@ -349,57 +349,57 @@ func NewElementary_stream_elem(stype uint8, esid uint8) *Elementary_stream_elem 
 //     CRC_32                                 32     rpchof
 // }
 
-type Program_stream_map struct {
-	Map_stream_id                uint8
-	Program_stream_map_length    uint16
-	Current_next_indicator       uint8
-	Program_stream_map_version   uint8
-	Program_stream_info_length   uint16
-	Elementary_stream_map_length uint16
-	Stream_map                   []*Elementary_stream_elem
+type ProgramStreamMap struct {
+	MapStreamId               uint8
+	ProgramStreamMapLength    uint16
+	CurrentNextIndicator      uint8
+	ProgramStreamMapVersion   uint8
+	ProgramStreamInfoLength   uint16
+	ElementaryStreamMapLength uint16
+	StreamMap                 []*ElementaryStreamElem
 }
 
-func (psm *Program_stream_map) PrettyPrint(file *os.File) {
-	file.WriteString(fmt.Sprintf("map_stream_id:%d\n", psm.Map_stream_id))
-	file.WriteString(fmt.Sprintf("program_stream_map_length:%d\n", psm.Program_stream_map_length))
-	file.WriteString(fmt.Sprintf("current_next_indicator:%d\n", psm.Current_next_indicator))
-	file.WriteString(fmt.Sprintf("program_stream_map_version:%d\n", psm.Program_stream_map_version))
-	file.WriteString(fmt.Sprintf("program_stream_info_length:%d\n", psm.Program_stream_info_length))
-	file.WriteString(fmt.Sprintf("elementary_stream_map_length:%d\n", psm.Elementary_stream_map_length))
-	for i, es := range psm.Stream_map {
+func (psm *ProgramStreamMap) PrettyPrint(file *os.File) {
+	file.WriteString(fmt.Sprintf("map stream id:%d\n", psm.MapStreamId))
+	file.WriteString(fmt.Sprintf("program stream map length:%d\n", psm.ProgramStreamMapLength))
+	file.WriteString(fmt.Sprintf("current next indicator:%d\n", psm.CurrentNextIndicator))
+	file.WriteString(fmt.Sprintf("program stream map version:%d\n", psm.ProgramStreamMapVersion))
+	file.WriteString(fmt.Sprintf("program stream info length:%d\n", psm.ProgramStreamInfoLength))
+	file.WriteString(fmt.Sprintf("elementary stream map length:%d\n", psm.ElementaryStreamMapLength))
+	for i, es := range psm.StreamMap {
 		file.WriteString(fmt.Sprintf("----ES stream %d\n", i))
-		if es.Stream_type == uint8(PS_STREAM_AAC) {
-			file.WriteString("    stream_type:AAC\n")
-		} else if es.Stream_type == uint8(PS_STREAM_G711A) {
-			file.WriteString("    stream_type:G711A\n")
-		} else if es.Stream_type == uint8(PS_STREAM_G711U) {
-			file.WriteString("    stream_type:G711U\n")
-		} else if es.Stream_type == uint8(PS_STREAM_H264) {
-			file.WriteString("    stream_type:H264\n")
-		} else if es.Stream_type == uint8(PS_STREAM_H265) {
-			file.WriteString("    stream_type:H265\n")
+		if es.StreamType == uint8(PsStreamAac) {
+			file.WriteString("    streamType:AAC\n")
+		} else if es.StreamType == uint8(PsStreamG711A) {
+			file.WriteString("    streamType:G711A\n")
+		} else if es.StreamType == uint8(PsStreamG711U) {
+			file.WriteString("    streamType:G711U\n")
+		} else if es.StreamType == uint8(PsStreamH264) {
+			file.WriteString("    streamType:H264\n")
+		} else if es.StreamType == uint8(PsStreamH265) {
+			file.WriteString("    streamType:H265\n")
 		}
-		file.WriteString(fmt.Sprintf("    elementary_stream_id:%d\n", es.Elementary_stream_id))
-		file.WriteString(fmt.Sprintf("    elementary_stream_info_length:%d\n", es.Elementary_stream_info_length))
+		file.WriteString(fmt.Sprintf("    elementary stream id:%d\n", es.ElementaryStreamId))
+		file.WriteString(fmt.Sprintf("    elementary stream info length:%d\n", es.ElementaryStreamInfoLength))
 	}
 }
 
-func (psm *Program_stream_map) Encode(bsw *BitStreamWriter) {
+func (psm *ProgramStreamMap) Encode(bsw *BitStreamWriter) {
 	bsw.PutBytes([]byte{0x00, 0x00, 0x01, 0xBC})
 	loc := bsw.ByteOffset()
-	bsw.PutUint16(psm.Program_stream_map_length, 16)
+	bsw.PutUint16(psm.ElementaryStreamMapLength, 16)
 	bsw.Markdot()
-	bsw.PutUint8(psm.Current_next_indicator, 1)
+	bsw.PutUint8(psm.CurrentNextIndicator, 1)
 	bsw.PutUint8(3, 2)
-	bsw.PutUint8(psm.Program_stream_map_version, 5)
+	bsw.PutUint8(psm.ProgramStreamMapVersion, 5)
 	bsw.PutUint8(0x7F, 7)
 	bsw.PutUint8(1, 1)
 	bsw.PutUint16(0, 16)
-	psm.Elementary_stream_map_length = uint16(len(psm.Stream_map) * 4)
-	bsw.PutUint16(psm.Elementary_stream_map_length, 16)
-	for _, streaminfo := range psm.Stream_map {
-		bsw.PutUint8(streaminfo.Stream_type, 8)
-		bsw.PutUint8(streaminfo.Elementary_stream_id, 8)
+	psm.ElementaryStreamMapLength = uint16(len(psm.StreamMap) * 4)
+	bsw.PutUint16(psm.ElementaryStreamMapLength, 16)
+	for _, streaminfo := range psm.StreamMap {
+		bsw.PutUint8(streaminfo.StreamType, 8)
+		bsw.PutUint8(streaminfo.ElementaryStreamId, 8)
 		bsw.PutUint16(0, 16)
 	}
 	length := bsw.DistanceFromMarkDot()/8 + 4
@@ -410,58 +410,58 @@ func (psm *Program_stream_map) Encode(bsw *BitStreamWriter) {
 	bsw.PutBytes(tmpcrc)
 }
 
-func (psm *Program_stream_map) Decode(bs *BitStream) error {
+func (psm *ProgramStreamMap) Decode(bs *BitStream) error {
 	if bs.RemainBytes() < 16 {
 		return errNeedMore
 	}
 	if bs.Uint32(24) != 0x000001 {
 		return errors.New("program stream map must startwith 0x000001")
 	}
-	psm.Map_stream_id = bs.Uint8(8)
-	if psm.Map_stream_id != 0xBC {
+	psm.MapStreamId = bs.Uint8(8)
+	if psm.MapStreamId != 0xBC {
 		return errors.New("map stream id must be 0xBC")
 	}
-	psm.Program_stream_map_length = bs.Uint16(16)
-	if bs.RemainBytes() < int(psm.Program_stream_map_length) {
+	psm.ProgramStreamMapLength = bs.Uint16(16)
+	if bs.RemainBytes() < int(psm.ProgramStreamMapLength) {
 		bs.UnRead(6 * 8)
 		return errNeedMore
 	}
-	psm.Current_next_indicator = bs.Uint8(1)
+	psm.CurrentNextIndicator = bs.Uint8(1)
 	bs.SkipBits(2)
-	psm.Program_stream_map_version = bs.Uint8(5)
+	psm.ProgramStreamMapVersion = bs.Uint8(5)
 	bs.SkipBits(8)
-	psm.Program_stream_info_length = bs.Uint16(16)
-	if bs.RemainBytes() < int(psm.Program_stream_info_length)+2 {
+	psm.ProgramStreamInfoLength = bs.Uint16(16)
+	if bs.RemainBytes() < int(psm.ProgramStreamInfoLength)+2 {
 		bs.UnRead(10 * 8)
 		return errNeedMore
 	}
-	bs.SkipBits(int(psm.Program_stream_info_length) * 8)
-	psm.Elementary_stream_map_length = bs.Uint16(16)
+	bs.SkipBits(int(psm.ProgramStreamInfoLength) * 8)
+	psm.ElementaryStreamMapLength = bs.Uint16(16)
 
-	psm.Elementary_stream_map_length = psm.Program_stream_map_length - psm.Program_stream_info_length - 10
+	psm.ElementaryStreamMapLength = psm.ProgramStreamMapLength - psm.ProgramStreamInfoLength - 10
 
-	if bs.RemainBytes() < int(psm.Elementary_stream_map_length)+4 {
-		bs.UnRead(12*8 + int(psm.Program_stream_info_length)*8)
+	if bs.RemainBytes() < int(psm.ElementaryStreamMapLength)+4 {
+		bs.UnRead(12*8 + int(psm.ProgramStreamInfoLength)*8)
 		return errNeedMore
 	}
 
 	i := 0
-	psm.Stream_map = psm.Stream_map[:0]
-	for i < int(psm.Elementary_stream_map_length) {
-		elem := new(Elementary_stream_elem)
-		elem.Stream_type = bs.Uint8(8)
-		elem.Elementary_stream_id = bs.Uint8(8)
-		elem.Elementary_stream_info_length = bs.Uint16(16)
+	psm.StreamMap = psm.StreamMap[:0]
+	for i < int(psm.ElementaryStreamMapLength) {
+		elem := new(ElementaryStreamElem)
+		elem.StreamType = bs.Uint8(8)
+		elem.ElementaryStreamId = bs.Uint8(8)
+		elem.ElementaryStreamInfoLength = bs.Uint16(16)
 		//TODO Parser descriptor
-		if bs.RemainBytes() < int(elem.Elementary_stream_info_length) {
+		if bs.RemainBytes() < int(elem.ElementaryStreamInfoLength) {
 			return errParser
 		}
-		bs.SkipBits(int(elem.Elementary_stream_info_length) * 8)
-		i += int(4 + elem.Elementary_stream_info_length)
-		psm.Stream_map = append(psm.Stream_map, elem)
+		bs.SkipBits(int(elem.ElementaryStreamInfoLength) * 8)
+		i += int(4 + elem.ElementaryStreamInfoLength)
+		psm.StreamMap = append(psm.StreamMap, elem)
 	}
 
-	if i != int(psm.Elementary_stream_map_length) {
+	if i != int(psm.ElementaryStreamMapLength) {
 		return errParser
 	}
 
@@ -469,30 +469,30 @@ func (psm *Program_stream_map) Decode(bs *BitStream) error {
 	return nil
 }
 
-type Program_stream_directory struct {
-	PES_packet_length uint16
+type ProgramStreamDirectory struct {
+	PesPacketLength uint16
 }
 
-func (psd *Program_stream_directory) Decode(bs *BitStream) error {
+func (psd *ProgramStreamDirectory) Decode(bs *BitStream) error {
 	if bs.RemainBytes() < 6 {
 		return errNeedMore
 	}
 	if bs.Uint32(32) != 0x000001FF {
 		return errors.New("program stream directory 000001FF")
 	}
-	psd.PES_packet_length = bs.Uint16(16)
-	if bs.RemainBytes() < int(psd.PES_packet_length) {
+	psd.PesPacketLength = bs.Uint16(16)
+	if bs.RemainBytes() < int(psd.PesPacketLength) {
 		bs.UnRead(6 * 8)
 		return errNeedMore
 	}
 	//TODO Program Stream directory
-	bs.SkipBits(int(psd.PES_packet_length) * 8)
+	bs.SkipBits(int(psd.PesPacketLength) * 8)
 	return nil
 }
 
 type CommonPesPacket struct {
-	Stream_id         uint8
-	PES_packet_length uint16
+	StreamId        uint8
+	PesPacketLength uint16
 }
 
 func (compes *CommonPesPacket) Decode(bs *BitStream) error {
@@ -500,21 +500,21 @@ func (compes *CommonPesPacket) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 	bs.SkipBits(24)
-	compes.Stream_id = bs.Uint8(8)
-	compes.PES_packet_length = bs.Uint16(16)
-	if bs.RemainBytes() < int(compes.PES_packet_length) {
+	compes.StreamId = bs.Uint8(8)
+	compes.PesPacketLength = bs.Uint16(16)
+	if bs.RemainBytes() < int(compes.PesPacketLength) {
 		bs.UnRead(6 * 8)
 		return errNeedMore
 	}
-	bs.SkipBits(int(compes.PES_packet_length) * 8)
+	bs.SkipBits(int(compes.PesPacketLength) * 8)
 	return nil
 }
 
-type PSPacket struct {
-	Header  *PSPackHeader
-	System  *System_header
-	Psm     *Program_stream_map
-	Psd     *Program_stream_directory
+type PsPacket struct {
+	Header  *PsPackHeader
+	System  *SystemHeader
+	Psm     *ProgramStreamMap
+	Psd     *ProgramStreamDirectory
 	CommPes *CommonPesPacket
 	Pes     *PesPacket
 }

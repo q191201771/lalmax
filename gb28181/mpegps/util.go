@@ -56,25 +56,25 @@ func CalcCrc32(crc uint32, buffer []byte) uint32 {
 	return crc
 }
 
-type START_CODE_TYPE int
+type StartCodeType int
 
 const (
-	START_CODE_3 START_CODE_TYPE = 3
-	START_CODE_4 START_CODE_TYPE = 4
+	StartCode3 StartCodeType = 3
+	STartCode4 StartCodeType = 4
 )
 
-func FindStartCode(nalu []byte, offset int) (int, START_CODE_TYPE) {
+func FindStartCode(nalu []byte, offset int) (int, StartCodeType) {
 	idx := bytes.Index(nalu[offset:], []byte{0x00, 0x00, 0x01})
 	switch {
 	case idx > 0:
 		if nalu[offset+idx-1] == 0x00 {
-			return offset + idx - 1, START_CODE_4
+			return offset + idx - 1, STartCode4
 		}
 		fallthrough
 	case idx == 0:
-		return offset + idx, START_CODE_3
+		return offset + idx, StartCode3
 	}
-	return -1, START_CODE_3
+	return -1, StartCode3
 }
 
 func SplitFrame(frames []byte, onFrame func(nalu []byte) bool) {

@@ -3,10 +3,10 @@ package mpegps
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/q191201771/lal/pkg/base"
-	"github.com/q191201771/lal/pkg/rtprtcp"
-	"github.com/q191201771/naza/pkg/nazabytes"
-	"github.com/q191201771/naza/pkg/nazalog"
+	"github.com/lalmax-pro/streamsvr/pkg/base"
+	"github.com/lalmax-pro/streamsvr/pkg/rtprtcp"
+	"github.com/lalmax-pro/streamsvr/utils/naza/nazabytes"
+	"github.com/lalmax-pro/streamsvr/utils/naza/nazalog"
 	"io"
 	"os"
 	"testing"
@@ -24,10 +24,10 @@ var ps7 []byte = []byte{0x00, 0x00, 0x01, 0xBA, 0x20, 0x0a, 0x00, 0x00, 0x00, 0x
 func TestPSDemuxer_Input(t *testing.T) {
 	type fields struct {
 		streamMap map[uint8]*psstream
-		pkg       *PSPacket
+		pkg       *PsPacket
 		cache     []byte
 		OnPacket  func(pkg Display, decodeResult error)
-		OnFrame   func(frame []byte, cid PS_STREAM_TYPE, pts uint64, dts uint64)
+		OnFrame   func(frame []byte, cid PsStreamType, pts uint64, dts uint64)
 	}
 	type args struct {
 		data []byte
@@ -40,40 +40,40 @@ func TestPSDemuxer_Input(t *testing.T) {
 	}{
 		{name: "test1", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps1}, wantErr: true},
 
 		{name: "test2", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps2}, wantErr: false},
 
 		{name: "test3", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps3}, wantErr: true},
 
 		{name: "test4", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps4}, wantErr: true},
 
 		{name: "test5", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps5}, wantErr: false},
 		{name: "test6", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps6}, wantErr: false},
 		{name: "test-mpeg1", fields: fields{
 			streamMap: make(map[uint8]*psstream),
-			pkg:       new(PSPacket),
+			pkg:       new(PsPacket),
 		}, args: args{data: ps7}, wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			psdemuxer := &PSDemuxer{
+			psdemuxer := &PsDemuxer{
 				streamMap: tt.fields.streamMap,
 				pkg:       tt.fields.pkg,
 				cache:     tt.fields.cache,
@@ -87,7 +87,7 @@ func TestPSDemuxer_Input(t *testing.T) {
 	}
 }
 func TestPSDemuxer(t *testing.T) {
-	var psUnpacker *PSDemuxer
+	var psUnpacker *PsDemuxer
 	os.Remove("h.ps")
 	os.Remove("h.h264")
 	os.Remove("ps_demux_result")
@@ -97,14 +97,14 @@ func TestPSDemuxer(t *testing.T) {
 		fmt.Println(err)
 		return
 	}
-	psUnpacker = NewPSDemuxer()
-	psUnpacker.OnFrame = func(frame []byte, cid PS_STREAM_TYPE, pts uint64, dts uint64) {
-		if cid == PS_STREAM_H264 || cid == PS_STREAM_H265 {
+	psUnpacker = NewPsDemuxer()
+	psUnpacker.OnFrame = func(frame []byte, cid PsStreamType, pts uint64, dts uint64) {
+		if cid == PsStreamH264 || cid == PsStreamH265 {
 			writeFile("h.h264", frame)
 		} else {
-			if cid == PS_STREAM_G711A {
+			if cid == PsStreamG711a {
 				nazalog.Infof("存在音频g711A 大小：%d  dts:%d", len(frame), dts)
-			} else if cid == PS_STREAM_G711U {
+			} else if cid == PsStreamG711u {
 				nazalog.Infof("存在音频g711U 大小：%d  dts:%d", len(frame), dts)
 			} else {
 				nazalog.Infof("存在音频aac 大小：%d dts:%d", len(frame), dts)
@@ -120,21 +120,21 @@ func TestPSDemuxer(t *testing.T) {
 	defer fd3.Close()
 	psUnpacker.OnPacket = func(pkg Display, decodeResult error) {
 		switch value := pkg.(type) {
-		case *PSPackHeader:
+		case *PsPackHeader:
 			fd3.WriteString("--------------PS Pack Header--------------\n")
 			if decodeResult == nil {
 				value.PrettyPrint(fd3)
 			} else {
 				fd3.WriteString(fmt.Sprintf("Decode Ps Packet Failed %s\n", decodeResult.Error()))
 			}
-		case *System_header:
+		case *SystemHeader:
 			fd3.WriteString("--------------System Header--------------\n")
 			if decodeResult == nil {
 				value.PrettyPrint(fd3)
 			} else {
 				fd3.WriteString(fmt.Sprintf("Decode Ps Packet Failed %s\n", decodeResult.Error()))
 			}
-		case *Program_stream_map:
+		case *ProgramStreamMap:
 			fd3.WriteString("--------------------PSM-------------------\n")
 			if decodeResult == nil {
 				value.PrettyPrint(fd3)
