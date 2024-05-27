@@ -22,18 +22,19 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 		return
 	}
 	router.Use(s.Cors())
-	// whip
-	router.POST("/whip", s.HandleWHIP)
-	router.OPTIONS("/whip", s.HandleWHIP)
-	router.DELETE("/whip", s.HandleWHIP)
 
+	rtc := router.Group("/webrtc")
+	// whip
+	rtc.POST("/whip", s.HandleWHIP)
+	rtc.OPTIONS("/whip", s.HandleWHIP)
+	rtc.DELETE("/whip", s.HandleWHIP)
 	// whep
-	router.POST("/whep", s.HandleWHEP)
-	router.OPTIONS("/whep", s.HandleWHEP)
-	router.DELETE("/whep", s.HandleWHEP)
-	//Jessibuca flv封装play
-	router.POST("/webrtc/play/live/:streamid", s.HandleJessibuca)
-	router.DELETE("/webrtc/play/live/:streamid", s.HandleJessibuca)
+	rtc.POST("/whep", s.HandleWHEP)
+	rtc.OPTIONS("/whep", s.HandleWHEP)
+	rtc.DELETE("/whep", s.HandleWHEP)
+	// Jessibuca flv封装play
+	rtc.POST("/play/live/:streamid", s.HandleJessibuca)
+	rtc.DELETE("/play/live/:streamid", s.HandleJessibuca)
 
 	// http-fmp4
 	router.GET("/live/m4s/:streamid", s.HandleHttpFmp4)
@@ -46,28 +47,31 @@ func (s *LalMaxServer) InitRouter(router *gin.Engine) {
 
 	// gb
 	gbLogic := gb28181.NewGbLogic(s.gbsbr)
-	router.GET("/api/gb/device_infos", gbLogic.GetDeviceInfos)
-	router.POST("/api/gb/start_play", gbLogic.StartPlay)
-	router.POST("/api/gb/stop_play", gbLogic.StopPlay)
-	router.POST("/api/gb/update_all_notify", gbLogic.UpdateAllNotify)
-	router.POST("/api/gb/update_notify", gbLogic.UpdateNotify)
-	router.POST("/api/gb/ptz_direction", gbLogic.PtzDirection)
-	router.POST("/api/gb/ptz_zoom", gbLogic.PtzZoom)
-	router.POST("/api/gb/ptz_fi", gbLogic.PtzFi)
-	router.POST("/api/gb/ptz_preset", gbLogic.PtzPreset)
-	router.POST("/api/gb/ptz_stop", gbLogic.PtzStop)
+	gb := router.Group("/api/gb")
+	gb.GET("/device_infos", gbLogic.GetDeviceInfos)
+	gb.POST("/start_play", gbLogic.StartPlay)
+	gb.POST("/stop_play", gbLogic.StopPlay)
+	gb.POST("/update_all_notify", gbLogic.UpdateAllNotify)
+	gb.POST("/update_notify", gbLogic.UpdateNotify)
+	gb.POST("/ptz_direction", gbLogic.PtzDirection)
+	gb.POST("/ptz_zoom", gbLogic.PtzZoom)
+	gb.POST("/ptz_fi", gbLogic.PtzFi)
+	gb.POST("/ptz_preset", gbLogic.PtzPreset)
+	gb.POST("/ptz_stop", gbLogic.PtzStop)
 
 	auth := Authentication(s.conf.HttpConfig.CtrlAuthWhitelist.Secrets, s.conf.HttpConfig.CtrlAuthWhitelist.IPs)
 	// stat
-	router.GET("/api/stat/group", auth, s.statGroupHandler)
-	router.GET("/api/stat/all_group", auth, s.statAllGroupHandler)
-	router.GET("/api/stat/lal_info", auth, s.statLalInfoHandler)
+	stat := router.Group("/api/stat", auth)
+	stat.GET("/group", s.statGroupHandler)
+	stat.GET("/all_group", s.statAllGroupHandler)
+	stat.GET("/lal_info", s.statLalInfoHandler)
 
 	// ctrl
-	router.POST("/api/ctrl/start_relay_pull", auth, s.ctrlStartRelayPullHandler)
-	router.POST("/api/ctrl/stop_relay_pull", auth, s.ctrlStopRelayPullHandler)
-	router.POST("/api/ctrl/kick_session", auth, s.ctrlKickSessionHandler)
-	router.POST("/api/ctrl/start_rtp_pub", auth, s.ctrlStartRtpPubHandler)
+	ctrl := router.Group("/api/ctrl", auth)
+	ctrl.POST("/start_relay_pull", s.ctrlStartRelayPullHandler)
+	ctrl.POST("/stop_relay_pull", s.ctrlStopRelayPullHandler)
+	ctrl.POST("/kick_session", s.ctrlKickSessionHandler)
+	ctrl.POST("/start_rtp_pub", s.ctrlStartRtpPubHandler)
 }
 
 func (s *LalMaxServer) HandleWHIP(c *gin.Context) {
@@ -93,6 +97,7 @@ func (s *LalMaxServer) HandleWHEP(c *gin.Context) {
 		c.Status(http.StatusOK)
 	}
 }
+
 func (s *LalMaxServer) HandleJessibuca(c *gin.Context) {
 	switch c.Request.Method {
 	case "POST":

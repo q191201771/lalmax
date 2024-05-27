@@ -97,10 +97,10 @@ datachannel播放地址：webrtc://127.0.0.1:1290/webrtc/play/live/test110
 
 ```
 WHIP推流url
-http(s)://127.0.0.1:1290/whip?streamid=test110
+http(s)://127.0.0.1:1290/webrtc/whip?streamid=test110
 
 WHEP拉流url
-http(s)://127.0.0.1:1290/whep?streamid=test110
+http(s)://127.0.0.1:1290/webrtc/whep?streamid=test110
 ```
 
 ## Http-fmp4
