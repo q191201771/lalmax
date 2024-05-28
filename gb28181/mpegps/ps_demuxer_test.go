@@ -3,10 +3,10 @@ package mpegps
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/lalmax-pro/streamsvr/pkg/base"
-	"github.com/lalmax-pro/streamsvr/pkg/rtprtcp"
-	"github.com/lalmax-pro/streamsvr/utils/naza/nazabytes"
-	"github.com/lalmax-pro/streamsvr/utils/naza/nazalog"
+	"github.com/q191201771/lal/pkg/base"
+	"github.com/q191201771/lal/pkg/rtprtcp"
+	"github.com/q191201771/naza/pkg/nazabytes"
+	"github.com/q191201771/naza/pkg/nazalog"
 	"io"
 	"os"
 	"testing"
@@ -23,7 +23,7 @@ var ps7 []byte = []byte{0x00, 0x00, 0x01, 0xBA, 0x20, 0x0a, 0x00, 0x00, 0x00, 0x
 
 func TestPSDemuxer_Input(t *testing.T) {
 	type fields struct {
-		streamMap map[uint8]*psstream
+		streamMap map[uint8]*psStream
 		pkg       *PsPacket
 		cache     []byte
 		OnPacket  func(pkg Display, decodeResult error)
@@ -39,35 +39,35 @@ func TestPSDemuxer_Input(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "test1", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps1}, wantErr: true},
 
 		{name: "test2", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps2}, wantErr: false},
 
 		{name: "test3", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps3}, wantErr: true},
 
 		{name: "test4", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps4}, wantErr: true},
 
 		{name: "test5", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps5}, wantErr: false},
 		{name: "test6", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps6}, wantErr: false},
 		{name: "test-mpeg1", fields: fields{
-			streamMap: make(map[uint8]*psstream),
+			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
 		}, args: args{data: ps7}, wantErr: false},
 	}
@@ -102,9 +102,9 @@ func TestPSDemuxer(t *testing.T) {
 		if cid == PsStreamH264 || cid == PsStreamH265 {
 			writeFile("h.h264", frame)
 		} else {
-			if cid == PsStreamG711a {
+			if cid == PsStreamG711A {
 				nazalog.Infof("存在音频g711A 大小：%d  dts:%d", len(frame), dts)
-			} else if cid == PsStreamG711u {
+			} else if cid == PsStreamG711U {
 				nazalog.Infof("存在音频g711U 大小：%d  dts:%d", len(frame), dts)
 			} else {
 				nazalog.Infof("存在音频aac 大小：%d dts:%d", len(frame), dts)
