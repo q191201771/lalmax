@@ -93,10 +93,11 @@ func (p *Ptz) Pack() string {
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
 	buf[2] = 0
-	if p.ZoomIn {
+	if p.ZoomOut {
 		buf[3] |= 1 << 5
 	}
-	if p.ZoomOut {
+
+	if p.ZoomIn {
 		buf[3] |= 1 << 4
 	}
 	if p.Up {
@@ -113,7 +114,7 @@ func (p *Ptz) Pack() string {
 	}
 	buf[4] = p.Speed
 	buf[5] = p.Speed
-	buf[6] = p.Speed
+	buf[6] = p.Speed << 4
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
 }
