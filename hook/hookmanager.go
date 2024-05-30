@@ -10,8 +10,10 @@ type HookSessionMangaer struct {
 	sessionMap sync.Map
 }
 
-var manager *HookSessionMangaer
-var once sync.Once
+var (
+	manager *HookSessionMangaer
+	once    sync.Once
+)
 
 func GetHookSessionManagerInstance() *HookSessionMangaer {
 	once.Do(func() {
@@ -28,10 +30,10 @@ func (m *HookSessionMangaer) SetHookSession(streamName string, session *HookSess
 
 func (m *HookSessionMangaer) RemoveHookSession(streamName string) {
 	nazalog.Info("RemoveHookSession, streamName:", streamName)
-	s, ok := m.sessionMap.Load(streamName)
-	if ok {
-		m.sessionMap.Delete(s)
-	}
+	// s, ok := m.sessionMap.Load(streamName)
+	// if ok {
+	m.sessionMap.Delete(streamName)
+	// }
 }
 
 func (m *HookSessionMangaer) GetHookSession(streamName string) (bool, *HookSession) {
