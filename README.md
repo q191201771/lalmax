@@ -93,6 +93,8 @@ srt://127.0.0.1:6001?streamid=#!::h=test110,m=request
 
 （5）支持datachannel,只支持对接jessibuca播放器
 
+（6）WHIP支持对接OBS 30.2 beta HEVC
+
 datachannel播放地址：webrtc://127.0.0.1:1290/webrtc/play/live/test110
 
 ```
