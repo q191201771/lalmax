@@ -146,6 +146,9 @@ http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 }
 ```
 
+## Room
+（1）集成livekit实现房间功能
+
 
 
 
