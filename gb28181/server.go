@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,13 +21,11 @@ import (
 	"github.com/q191201771/lal/pkg/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
 	"golang.org/x/net/html/charset"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 )
 
 type IMediaOpObserver interface {
 	OnStartMediaServer(netWork string, singlePort bool, deviceId string, channelId string) *mediaserver.GB28181MediaServer
-	OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string) error
+	OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string, StreamName string) error
 }
 type GB28181Server struct {
 	conf              config.GB28181Config
@@ -41,6 +38,9 @@ type GB28181Server struct {
 
 	udpAvailConnPool *AvailConnPool
 	tcpAvailConnPool *AvailConnPool
+
+	sipUdpSvr gosip.Server
+	sipTcpSvr gosip.Server
 
 	MediaServerMap sync.Map
 	disposeOnce    sync.Once
@@ -61,11 +61,6 @@ func NewGB28181Server(conf config.GB28181Config, lal logic.ILalServer) *GB28181S
 	if conf.ListenAddr == "" {
 		conf.ListenAddr = "0.0.0.0"
 	}
-
-	if conf.SipNetwork == "" {
-		conf.SipNetwork = "udp"
-	}
-
 	if conf.SipPort == 0 {
 		conf.SipPort = 5060
 	}
@@ -117,26 +112,30 @@ func NewGB28181Server(conf config.GB28181Config, lal logic.ILalServer) *GB28181S
 }
 
 func (s *GB28181Server) Start() {
+	s.sipUdpSvr = s.newSipServer("udp")
+	s.sipTcpSvr = s.newSipServer("tcp")
+	go s.startJob()
+}
+func (s *GB28181Server) newSipServer(network string) gosip.Server {
 	srvConf := gosip.ServerConfig{}
 
 	if s.conf.SipIP != "" {
 		srvConf.Host = s.conf.SipIP
 	}
-	sipsvr = gosip.NewServer(srvConf, nil, nil, logger)
-	sipsvr.OnRequest(sip.REGISTER, s.OnRegister)
-	sipsvr.OnRequest(sip.MESSAGE, s.OnMessage)
-	sipsvr.OnRequest(sip.NOTIFY, s.OnNotify)
-	sipsvr.OnRequest(sip.BYE, s.OnBye)
+	sipSvr := gosip.NewServer(srvConf, nil, nil, logger)
+	sipSvr.OnRequest(sip.REGISTER, s.OnRegister)
+	sipSvr.OnRequest(sip.MESSAGE, s.OnMessage)
+	sipSvr.OnRequest(sip.NOTIFY, s.OnNotify)
+	sipSvr.OnRequest(sip.BYE, s.OnBye)
 
 	addr := s.conf.ListenAddr + ":" + strconv.Itoa(int(s.conf.SipPort))
-	err := sipsvr.Listen(s.conf.SipNetwork, addr)
+	err := sipSvr.Listen(network, addr)
 	if err != nil {
 		nazalog.Fatal(err)
 	}
 
-	nazalog.Info("gb28181 sip listen success, network:", s.conf.SipNetwork, " listen addr:", addr)
-
-	go s.startJob()
+	nazalog.Info(" start sip server listen. addr= " + addr + "  network:" + network)
+	return sipSvr
 }
 func (s *GB28181Server) Dispose() {
 	s.disposeOnce.Do(
@@ -146,6 +145,8 @@ func (s *GB28181Server) Dispose() {
 				mediaServer.Dispose()
 				return true
 			})
+			s.sipTcpSvr.Shutdown()
+			s.sipUdpSvr.Shutdown()
 		})
 }
 func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, deviceId string, channelId string) *mediaserver.GB28181MediaServer {
@@ -218,7 +219,7 @@ func (s *GB28181Server) OnStartMediaServer(netWork string, singlePort bool, devi
 	}
 	return mediasvr
 }
-func (s *GB28181Server) OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string) error {
+func (s *GB28181Server) OnStopMediaServer(netWork string, singlePort bool, deviceId string, channelId string, StreamName string) error {
 	isTcpFlag := false
 	if netWork == "tcp" {
 		isTcpFlag = true
@@ -249,8 +250,11 @@ func (s *GB28181Server) OnStopMediaServer(netWork string, singlePort bool, devic
 		}
 	}
 	if mediasvr != nil {
-		mediasvr.Dispose()
-
+		if singlePort {
+			mediasvr.CloseConn(StreamName)
+		} else {
+			mediasvr.Dispose()
+		}
 	}
 	return nil
 }
@@ -719,6 +723,12 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 		d.UpdateTime = time.Now()
 		d.NetAddr = deviceIp
 		d.addr = deviceAddr
+		d.network = strings.ToLower(req.Transport())
+		if d.network == "udp" {
+			d.sipSvr = s.sipUdpSvr
+		} else {
+			d.sipSvr = s.sipTcpSvr
+		}
 		nazalog.Info("UpdateDevice, netaddr:", d.NetAddr)
 	} else {
 		servIp := req.Recipient().Host()
@@ -735,6 +745,12 @@ func (s *GB28181Server) StoreDevice(id string, req sip.Request) (d *Device) {
 			mediaIP:      mediaIp,
 			NetAddr:      deviceIp,
 			conf:         s.conf,
+			network:      strings.ToLower(req.Transport()),
+		}
+		if d.network == "udp" {
+			d.sipSvr = s.sipUdpSvr
+		} else {
+			d.sipSvr = s.sipTcpSvr
 		}
 		d.WithMediaServer(s)
 		nazalog.Info("StoreDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
@@ -758,62 +774,15 @@ func (s *GB28181Server) RecoverDevice(d *Device, req sip.Request) {
 	d.sipIP = sipIp
 	d.mediaIP = mediaIp
 	d.NetAddr = deviceIp
+	d.network = strings.ToLower(req.Transport())
+	if d.network == "udp" {
+		d.sipSvr = s.sipUdpSvr
+	} else {
+		d.sipSvr = s.sipTcpSvr
+	}
 	d.UpdateTime = time.Now()
 
 	nazalog.Info("RecoverDevice, deviceIp:", deviceIp, " serverIp:", servIp, " mediaIp:", mediaIp, " sipIP:", sipIp)
-}
-
-func RandNumString(n int) string {
-	numbers := "0123456789"
-	return randStringBySoure(numbers, n)
-}
-
-func RandString(n int) string {
-	letterBytes := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	return randStringBySoure(letterBytes, n)
-}
-
-// https://github.com/kpbird/golang_random_string
-func randStringBySoure(src string, n int) string {
-	randomness := make([]byte, n)
-
-	rand.Seed(time.Now().UnixNano())
-	_, err := rand.Read(randomness)
-	if err != nil {
-		panic(err)
-	}
-
-	l := len(src)
-
-	// fill output
-	output := make([]byte, n)
-	for pos := range output {
-		random := randomness[pos]
-		randomPos := random % uint8(l)
-		output[pos] = src[randomPos]
-	}
-
-	return string(output)
-}
-
-func DecodeGbk(v interface{}, body []byte) error {
-	bodyBytes, err := GbkToUtf8(body)
-	if err != nil {
-		return err
-	}
-	decoder := xml.NewDecoder(bytes.NewReader(bodyBytes))
-	decoder.CharsetReader = charset.NewReaderLabel
-	err = decoder.Decode(v)
-	return err
-}
-
-func GbkToUtf8(s []byte) ([]byte, error) {
-	reader := transform.NewReader(bytes.NewReader(s), simplifiedchinese.GBK.NewDecoder())
-	d, e := ioutil.ReadAll(reader)
-	if e != nil {
-		return s, e
-	}
-	return d, nil
 }
 
 type notifyMessage struct {

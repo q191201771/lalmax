@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/q191201771/lalmax/gb28181/mpegps"
@@ -49,6 +50,10 @@ type Conn struct {
 
 	buffer *bytes.Buffer
 	key    string
+
+	mediaServer *GB28181MediaServer
+	one         sync.Once
+	oneSaveConn sync.Once
 }
 
 func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
@@ -65,13 +70,16 @@ func NewConn(conn net.Conn, observer IGbObserver, lal logic.ILalServer) *Conn {
 
 	return c
 }
+func (c *Conn) SetMediaServer(mediaServer *GB28181MediaServer) {
+	c.mediaServer = mediaServer
+}
 func (c *Conn) SetKey(key string) {
 	c.key = key
 }
 func (c *Conn) Serve() (err error) {
 	defer func() {
 		nazalog.Info("conn close, err:", err)
-		c.conn.Close()
+		c.Close()
 
 		if c.observer != nil {
 			c.observer.NotifyClose(c.streamName)
@@ -85,7 +93,7 @@ func (c *Conn) Serve() (err error) {
 	nazalog.Info("gb28181 conn, remoteaddr:", c.conn.RemoteAddr().String(), " localaddr:", c.conn.LocalAddr().String())
 
 	for {
-		c.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+		c.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		pkt := &rtp.Packet{}
 		if c.conn.RemoteAddr().Network() == "udp" {
 			buf := make([]byte, 1472*4)
@@ -137,6 +145,11 @@ func (c *Conn) Serve() (err error) {
 			}
 			c.check = true
 			c.streamName = mediaInfo.StreamName
+			c.oneSaveConn.Do(func() {
+				if c.mediaServer != nil {
+					c.mediaServer.conns.Store(c.streamName, c)
+				}
+			})
 			if len(mediaInfo.DumpFileName) > 0 {
 				c.psDumpFile = base.NewDumpFile()
 				if err = c.psDumpFile.OpenToWrite(mediaInfo.DumpFileName); err != nil {
@@ -253,7 +266,11 @@ func (c *Conn) OnFrame(frame []byte, cid mpegps.PsStreamType, pts uint64, dts ui
 		c.lalSession.FeedAvPacket(pkt)
 	}
 }
-
+func (c *Conn) Close() {
+	c.one.Do(func() {
+		c.conn.Close()
+	})
+}
 func getPayloadType(cid mpegps.PsStreamType) base.AvPacketPt {
 	switch cid {
 	case mpegps.PsStreamAac:

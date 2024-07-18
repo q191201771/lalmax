@@ -2,6 +2,7 @@ package gb28181
 
 import (
 	"context"
+	"github.com/ghettovoice/gosip"
 	"net/http"
 	"strings"
 	"sync"
@@ -58,10 +59,18 @@ type Device struct {
 
 	observer IMediaOpObserver
 	conf     config.GB28181Config
+
+	network string
+	sipSvr  gosip.Server
 }
 
 func (d *Device) WithMediaServer(observer IMediaOpObserver) {
 	d.observer = observer
+}
+
+func (d *Device) WithSipSvr(sipSvr gosip.Server) *Device {
+	d.sipSvr = sipSvr
+	return d
 }
 
 func (d *Device) syncChannels() {
@@ -171,7 +180,7 @@ func (d *Device) CreateRequest(Method sip.RequestMethod, conf config.GB28181Conf
 		nil,
 	)
 
-	req.SetTransport(conf.SipNetwork)
+	req.SetTransport(d.network)
 	req.SetDestination(d.NetAddr)
 	return
 }
@@ -330,5 +339,5 @@ func (d *Device) UpdateChannelPosition(channelId string, gpsTime string, lng str
 }
 
 func (d *Device) SipRequestForResponse(request sip.Request) (sip.Response, error) {
-	return sipsvr.RequestWithContext(context.Background(), request)
+	return d.sipSvr.RequestWithContext(context.Background(), request)
 }

@@ -207,11 +207,9 @@ func (channel *Channel) Invite(opt *InviteOptions, streamName string, playInfo *
 		nazalog.Error("invite failed, err:", err, " invite msg:", invite.String())
 
 		//jay 在media端口监听成功后，但是sip发送失败时
-		if !playInfo.SinglePort {
-			if channel.observer != nil {
-				if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
-					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
-				}
+		if channel.observer != nil {
+			if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId, ""); err != nil {
+				nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
 			}
 		}
 
@@ -249,15 +247,15 @@ func (channel *Channel) Invite(opt *InviteOptions, streamName string, playInfo *
 		channel.ackReq = ackReq
 		channel.playInfo = playInfo
 
-		err = sipsvr.Send(ackReq)
+		err = channel.device.sipSvr.Send(ackReq)
 	} else {
-		if !playInfo.SinglePort {
-			if channel.observer != nil {
-				if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
-					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
-				}
+
+		if channel.observer != nil {
+			if err = channel.observer.OnStopMediaServer(playInfo.NetWork, playInfo.SinglePort, channel.device.ID, channel.ChannelId, ""); err != nil {
+				nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
 			}
 		}
+
 	}
 	return
 }
@@ -271,11 +269,9 @@ func (channel *Channel) GetCallId() string {
 }
 func (channel *Channel) stopMediaServer() (err error) {
 	if channel.playInfo != nil {
-		if !channel.playInfo.SinglePort {
-			if channel.observer != nil {
-				if err = channel.observer.OnStopMediaServer(channel.playInfo.NetWork, channel.playInfo.SinglePort, channel.device.ID, channel.ChannelId); err != nil {
-					nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
-				}
+		if channel.observer != nil {
+			if err = channel.observer.OnStopMediaServer(channel.playInfo.NetWork, channel.playInfo.SinglePort, channel.device.ID, channel.ChannelId, channel.playInfo.StreamName); err != nil {
+				nazalog.Errorf("gb28181 MediaServer stop err:%s", err.Error())
 			}
 		}
 	}
@@ -288,21 +284,18 @@ func (channel *Channel) byeClear() (err error) {
 	return
 }
 func (channel *Channel) Bye(streamName string) (err error) {
-
 	if channel.ackReq != nil {
 		byeReq := channel.ackReq
 		channel.ackReq = nil
 		byeReq.SetMethod(sip.BYE)
 		seq, _ := byeReq.CSeq()
 		seq.SeqNo += 1
-		sipsvr.Send(byeReq)
+		channel.device.sipSvr.Send(byeReq)
 	} else {
 		err = errors.New("channel has been closed")
 	}
-
 	channel.stopMediaServer()
 	return err
-
 }
 func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB28181Config) (req sip.Request) {
 	d := channel.device
@@ -357,7 +350,7 @@ func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB281
 		nil,
 	)
 
-	req.SetTransport(conf.SipNetwork)
+	req.SetTransport(channel.device.network)
 	req.SetDestination(d.NetAddr)
 	return req
 }

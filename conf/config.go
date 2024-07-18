@@ -65,7 +65,6 @@ type HlsConfig struct {
 type GB28181Config struct {
 	Enable            bool               `json:"enable"`             // gb28181使能标志
 	ListenAddr        string             `json:"listen_addr"`        // gb28181监听地址
-	SipNetwork        string             `json:"sip_network"`        // 传输协议，默认UDP，可选TCP
 	SipIP             string             `json:"sip_ip"`             // sip 服务器公网IP
 	SipPort           uint16             `json:"sip_port"`           // sip 服务器端口，默认 5060
 	Serial            string             `json:"serial"`             // sip 服务器 id, 默认 34020000002000000001
