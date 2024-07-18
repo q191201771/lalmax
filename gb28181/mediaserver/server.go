@@ -26,7 +26,7 @@ type GB28181MediaServer struct {
 	observer    IGbObserver
 	mediaKey    string
 
-	conn *Conn //增加链接对象，目前只适用于多端口
+	conns sync.Map //增加链接对象，目前只适用于多端口
 }
 
 func NewGB28181MediaServer(listenPort int, mediaKey string, observer IGbObserver, lal logic.ILalServer) *GB28181MediaServer {
@@ -61,21 +61,29 @@ func (s *GB28181MediaServer) Start(listener net.Listener) (err error) {
 
 				c := NewConn(conn, s.observer, s.lalServer)
 				c.SetKey(s.mediaKey)
-
-				s.conn = c
-				go c.Serve()
+				c.SetMediaServer(s)
+				go func() {
+					c.Serve()
+					s.conns.Delete(c.streamName)
+				}()
 			}
 		}()
 	}
 	return
 }
+func (s *GB28181MediaServer) CloseConn(streamName string) {
+	if v, ok := s.conns.Load(streamName); ok {
+		conn := v.(*Conn)
+		conn.Close()
+	}
+}
 func (s *GB28181MediaServer) Dispose() {
 	s.disposeOnce.Do(func() {
-
-		if s.conn != nil {
-			s.conn.conn.Close()
-		}
-
+		s.conns.Range(func(_, value any) bool {
+			conn := value.(*Conn)
+			conn.Close()
+			return true
+		})
 		if s.listener != nil {
 			s.listener.Close()
 			s.listener = nil

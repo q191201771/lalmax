@@ -36,7 +36,6 @@
     "realm": "3402000000",
     "sip_ip": "192.168.254.165",
     "sip_port": 5060,
-    "sip_network": "udp",
     "username": "",
     "media_config": {
       "media_ip": "192.168.254.165"
