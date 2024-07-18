@@ -288,7 +288,7 @@ func (channel *Channel) byeClear() (err error) {
 	return
 }
 func (channel *Channel) Bye(streamName string) (err error) {
-	err = channel.stopMediaServer()
+
 	if channel.ackReq != nil {
 		byeReq := channel.ackReq
 		channel.ackReq = nil
@@ -296,10 +296,13 @@ func (channel *Channel) Bye(streamName string) (err error) {
 		seq, _ := byeReq.CSeq()
 		seq.SeqNo += 1
 		sipsvr.Send(byeReq)
-		return err
 	} else {
-		return errors.New("channel has been closed")
+		err = errors.New("channel has been closed")
 	}
+
+	channel.stopMediaServer()
+	return err
+
 }
 func (channel *Channel) CreateRequst(Method sip.RequestMethod, conf config.GB28181Config) (req sip.Request) {
 	d := channel.device
