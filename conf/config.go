@@ -14,11 +14,12 @@ type Config struct {
 	HttpFmp4Config   HttpFmp4Config   `json:"httpfmp4_config"` // http-fmp4配置
 	HlsConfig        HlsConfig        `json:"hls_config"`      // hls-fmp4/llhls配置
 	GB28181Config    GB28181Config    `json:"gb28181_config"`  // gb28181配置
-	OnvifConfig      OnvifConfig      `json:"onvif_config"`    //
+	OnvifConfig      OnvifConfig      `json:"onvif_config"`    // onvif配置
 	ServerId         string           `json:"server_id"`       // http 通知唯一标识
 	HttpNotifyConfig HttpNotifyConfig `json:"http_notify"`     // http 通知配置
 	LalSvrConfigPath string           `json:"lal_config_path"` // lal配置目录
-	HookConfig       HookConfig       `json:"hook_config"`
+	HookConfig       HookConfig       `json:"hook_config"`     // gop cache配置
+	RoomConfig       RoomConfig       `json:"room_config"`     // room配置
 }
 
 type SrtConfig struct {
@@ -83,7 +84,7 @@ type GB28181MediaConfig struct {
 }
 
 type OnvifConfig struct {
-	Enable bool `json:"enable"`
+	Enable bool `json:"enable"` // onvif使能标志
 }
 
 type HttpNotifyConfig struct {
@@ -104,6 +105,12 @@ type HttpNotifyConfig struct {
 type HookConfig struct {
 	GopCacheNum          int `json:"gop_cache_num"`
 	SingleGopMaxFrameNum int `json:"single_gop_max_frame_num"`
+}
+
+type RoomConfig struct {
+	Enable    bool   `json:"enable"`     // room功能使能标志
+	APIKey    string `json:"api_key"`    // livekit api key
+	APISecret string `json:"api_secret"` // livekit api secret
 }
 
 func Open(filepath string) error {

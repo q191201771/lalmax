@@ -46,6 +46,11 @@
   "onvif_config": {
     "enable": true
   },
+  "room_config": {
+    "enable": true,
+    "api_key": "lalmaxkey",
+    "api_secret": "lalmaxsecret"
+  },
   "server_id": "1",
   "http_notify": {
     "enable": false,
