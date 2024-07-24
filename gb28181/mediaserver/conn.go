@@ -87,7 +87,9 @@ func (c *Conn) Serve() (err error) {
 		if c.psDumpFile != nil {
 			c.psDumpFile.Close()
 		}
-		c.lalServer.DelCustomizePubSession(c.lalSession)
+		if c.lalSession != nil {
+			c.lalServer.DelCustomizePubSession(c.lalSession)
+		}
 	}()
 
 	nazalog.Info("gb28181 conn, remoteaddr:", c.conn.RemoteAddr().String(), " localaddr:", c.conn.LocalAddr().String())
