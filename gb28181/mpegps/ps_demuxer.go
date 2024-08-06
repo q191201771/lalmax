@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/q191201771/lal/pkg/avc"
 	"github.com/q191201771/lal/pkg/hevc"
+	"github.com/q191201771/naza/pkg/nazalog"
 )
 
 type psStream struct {
@@ -26,6 +27,10 @@ func (p *psStream) setCid(cid PsStreamType) {
 	p.cid = cid
 }
 
+func (p *psStream) clearBuf() {
+	p.streamBuf = p.streamBuf[:0]
+}
+
 type PsDemuxer struct {
 	streamMap map[uint8]*psStream
 	pkg       *PsPacket
@@ -36,6 +41,10 @@ type PsDemuxer struct {
 	//decodeResult 解码ps包时的产生的错误
 	//这个回调主要用于debug，查看是否ps包存在问题
 	OnPacket func(pkg Display, decodeResult error)
+
+	verifyBuf []byte
+
+	log nazalog.Logger
 }
 
 func NewPsDemuxer() *PsDemuxer {
@@ -46,12 +55,6 @@ func NewPsDemuxer() *PsDemuxer {
 		OnFrame:   nil,
 		OnPacket:  nil,
 	}
-	//兼容没有发送psm的ps包
-	//兼容没有发送psm的ps包
-	streamH264 := newPsStream(uint8(PesStreamVideo), PsStreamH264)
-	streamG711A := newPsStream(uint8(PesStreamAudio), PsStreamG711A)
-	psDemuxer.streamMap[streamH264.sid] = streamH264
-	psDemuxer.streamMap[streamG711A.sid] = streamG711A
 	return psDemuxer
 }
 
@@ -163,6 +166,31 @@ func (psDemuxer *PsDemuxer) Input(data []byte) error {
 							stream.streamBuf = append(stream.streamBuf, psDemuxer.pkg.Pes.PesPayload...)
 							stream.pts = psDemuxer.pkg.Pes.Pts
 							stream.dts = psDemuxer.pkg.Pes.Dts
+						} else if psDemuxer.pkg.Pes.StreamId == uint8(PesStreamVideo) {
+							if len(psDemuxer.verifyBuf) > 256 {
+								psDemuxer.verifyBuf = psDemuxer.verifyBuf[:0]
+							}
+							psDemuxer.verifyBuf = append(psDemuxer.verifyBuf, psDemuxer.pkg.Pes.PesPayload...)
+							if h26x, err := mpegH26xVerify(psDemuxer.verifyBuf); err == nil {
+								switch h26x {
+								case CodecUnknown:
+								case CodecH264:
+									streamH264 := newPsStream(uint8(PesStreamVideo), PsStreamH264)
+									psDemuxer.streamMap[streamH264.sid] = streamH264
+									psDemuxer.demuxPespacket(streamH264, psDemuxer.pkg.Pes)
+								case CodecH265:
+									streamH265 := newPsStream(uint8(PesStreamVideo), PsStreamH265)
+									psDemuxer.streamMap[streamH265.sid] = streamH265
+									psDemuxer.demuxPespacket(streamH265, psDemuxer.pkg.Pes)
+								}
+							}
+						} else if psDemuxer.pkg.Pes.StreamId == uint8(PesStreamAudio) {
+							if _, found = psDemuxer.streamMap[uint8(PesStreamVideo)]; found {
+								psStreamType := audioVerify(psDemuxer.pkg.Pes.PesPayload)
+								streamAudio := newPsStream(uint8(PesStreamAudio), psStreamType)
+								psDemuxer.streamMap[streamAudio.sid] = streamAudio
+								psDemuxer.demuxPespacket(streamAudio, psDemuxer.pkg.Pes)
+							}
 						}
 					}
 				}
@@ -192,40 +220,18 @@ func (psDemuxer *PsDemuxer) Flush() {
 
 func (psDemuxer *PsDemuxer) guessCodecid(stream *psStream) {
 	if stream.sid&0xE0 == uint8(PesStreamAudio) {
-		stream.cid = PsStreamAac
+		psStreamType := audioVerify(psDemuxer.pkg.Pes.PesPayload)
+		stream.cid = psStreamType
 	} else if stream.sid&0xE0 == uint8(PesStreamVideo) {
-		h264score := 0
-		h265score := 0
-		SplitFrame(stream.streamBuf, func(nalu []byte) bool {
-			h264nalutype := avc.ParseNaluType(nalu[0])
-			h265nalutype := hevc.ParseNaluType(nalu[0])
-			if h264nalutype == avc.NaluTypeSps ||
-				h264nalutype == avc.NaluTypePps ||
-				h264nalutype == avc.NaluTypeIdrSlice {
-				h264score += 2
-			} else if h264nalutype < 5 {
-				h264score += 1
-			} else if h264nalutype > 20 {
-				h264score -= 1
-			}
-
-			if h265nalutype == hevc.NaluTypeSps ||
-				h265nalutype == hevc.NaluTypePps ||
-				h265nalutype == hevc.NaluTypeVps ||
-				(h265nalutype >= hevc.NaluTypeSliceBlaWlp && h265nalutype <= hevc.NaluTypeSliceRsvIrapVcl23) {
-				h265score += 2
-			} else if h265nalutype >= hevc.NaluTypeSliceTrailN && h265nalutype <= hevc.NaluTypeSliceRaslR {
-				h265score += 1
-			} else if h265nalutype > 40 {
-				h265score -= 1
-			}
-			if h264score > h265score && h264score >= 4 {
+		if h26x, err := mpegH26xVerify(stream.streamBuf); err == nil {
+			switch h26x {
+			case CodecUnknown:
+			case CodecH264:
 				stream.cid = PsStreamH264
-			} else if h264score < h265score && h265score >= 4 {
+			case CodecH265:
 				stream.cid = PsStreamH265
 			}
-			return true
-		})
+		}
 	}
 }
 

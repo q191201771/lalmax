@@ -1,6 +1,17 @@
 package mpegps
 
-import "bytes"
+import (
+	"bytes"
+	"errors"
+)
+
+const (
+	CodecUnknown = iota
+	CodecH264
+	CodecH265
+	CodecH266
+	CodecMpeg4
+)
 
 var crc32table [256]uint32 = [256]uint32{
 	0x00000000, 0xB71DC104, 0x6E3B8209, 0xD926430D, 0xDC760413, 0x6B6BC517,
@@ -101,4 +112,86 @@ func H264NaluType(h264 []byte) uint8 {
 func H265NaluType(h265 []byte) uint8 {
 	loc, sc := FindStartCode(h265, 0)
 	return (h265[loc+int(sc)] >> 1) & 0x3F
+}
+
+func mpegH264FindNALU(data []byte) (int, int, error) {
+	var zeros, i int
+
+	for i = 0; i+2 < len(data); i++ {
+		if data[i] == 0x01 && zeros >= 2 {
+			return i + 1, zeros + 1, nil // 返回 NALU 的长度和前导零的数量
+		}
+
+		if data[i] == 0 {
+			zeros++
+		} else {
+			zeros = 0
+		}
+	}
+
+	return -1, 0, errors.New("no valid NALU found")
+}
+
+// 来自media-server
+func mpegH26xVerify(data []byte) (int, error) {
+	h264Flags := uint32(0x01A0)      // SPS/PPS/IDR
+	h265Flags := uint64(0x700000000) // VPS/SPS/PPS
+	h266Flags := uint32(0xC000)      // VPS/SPS/PPS
+	count := 0
+	h26x := [5][10]int{}
+
+	p := 0
+	end := len(data)
+
+	for p < end && count < len(h26x[0]) {
+		n, _, err := mpegH264FindNALU(data[p:])
+		if err != nil {
+			break
+		}
+		if p+n+1 > end {
+			break
+		}
+
+		h26x[0][count] = int(data[p+n]) & 0x1F          // H.264 NALU type
+		h26x[1][count] = (int(data[p+n]) >> 1) & 0x3F   // H.265 NALU type
+		h26x[2][count] = (int(data[p+n+1]) >> 3) & 0x1F // H.266 NALU type
+		h26x[3][count] = int(data[p+n])                 // MPEG-4 VOP start code
+		h26x[4][count] = int(data[p+n+1])               // MPEG-4 VOP coding type
+		count++
+
+		p += n // 移动到下一个 NALU
+	}
+
+	for n := 0; n < count; n++ {
+		h264Flags &= ^(1 << h26x[0][n])
+		h265Flags &= ^(1 << h26x[1][n])
+		h266Flags &= ^(1 << h26x[2][n])
+	}
+
+	if h264Flags == 0 && h265Flags != 0 && h266Flags != 0 {
+		// match SPS/PPS/IDR
+		return CodecH264, nil
+	} else if h265Flags == 0 && h264Flags != 0 && h266Flags != 0 {
+		// match VPS/SPS/PPS
+		return CodecH265, nil
+	} else if h266Flags == 0 && h264Flags != 0 && h265Flags != 0 {
+		// match SPS/PPS
+		return CodecH266, nil
+	} else if h26x[3][0] == 0xB0 && (h26x[4][0]&0x30) == 0 {
+		// match VOP start code
+		return CodecMpeg4, nil
+	}
+
+	return CodecUnknown, nil
+}
+func audioVerify(data []byte) PsStreamType {
+	if data[0] == 0xFF && (data[1]&0xF0) == 0xF0 && len(data) > 7 {
+		aacLen := ((int(data[3]) & 0x03) << 11) |
+			(int(data[4]) << 3) |
+			(int(data[5]) >> 5 & 0x07)
+		if len(data) == aacLen {
+			return PsStreamAac
+		}
+	}
+	return PsStreamG711A
 }
