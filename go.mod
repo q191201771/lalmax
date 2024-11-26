@@ -27,6 +27,7 @@ require (
 )
 
 require (
+	github.com/Eyevinn/mp4ff v0.47.0 // indirect
 	github.com/abema/go-mp4 v1.2.0 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/asticode/go-astits v1.13.0 // indirect
