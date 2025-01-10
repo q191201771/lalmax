@@ -92,29 +92,35 @@ func (p *Ptz) Pack() string {
 	buf := make([]byte, 8)
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
-	buf[2] = 0
+	buf[2] = 1
+	buf[4] = 0
+	buf[5] = 0
+	buf[6] = 0
 	if p.ZoomOut {
 		buf[3] |= 1 << 5
+		buf[6] = p.Speed << 4
 	}
 
 	if p.ZoomIn {
 		buf[3] |= 1 << 4
+		buf[6] = p.Speed << 4
 	}
 	if p.Up {
 		buf[3] |= 1 << 3
+		buf[5] = p.Speed
 	}
 	if p.Down {
 		buf[3] |= 1 << 2
+		buf[5] = p.Speed
 	}
 	if p.Left {
 		buf[3] |= 1 << 1
+		buf[4] = p.Speed
 	}
 	if p.Right {
 		buf[3] |= 1
+		buf[4] = p.Speed
 	}
-	buf[4] = p.Speed
-	buf[5] = p.Speed
-	buf[6] = p.Speed << 4
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
 }
@@ -123,7 +129,7 @@ func (p *Ptz) Stop() string {
 	buf := make([]byte, 8)
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
-	buf[2] = 0
+	buf[2] = 1
 	buf[3] = 0
 	buf[4] = 0
 	buf[5] = 0
@@ -150,25 +156,28 @@ func (f *Fi) Pack() string {
 	buf := make([]byte, 8)
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
-	buf[2] = 0
+	buf[2] = 1
 	buf[3] |= 1 << 6
+	buf[4] = 0
+	buf[5] = 0
+	buf[6] = 0
 
 	if f.IrisIn {
 		buf[3] |= 1 << 3
+		buf[5] = f.Speed
 	}
 	if f.IrisOut {
 		buf[3] |= 1 << 2
+		buf[5] = f.Speed
 	}
 	if f.FocusNear {
 		buf[3] |= 1 << 1
+		buf[4] = f.Speed
 	}
 	if f.FocusFar {
 		buf[3] |= 1
+		buf[4] = f.Speed
 	}
-
-	buf[4] = f.Speed
-	buf[5] = f.Speed
-	buf[6] = 0
 	getVerificationCode(buf)
 	return hex.EncodeToString(buf)
 }
@@ -182,7 +191,7 @@ func (p *Preset) Pack() string {
 	buf := make([]byte, 8)
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
-	buf[2] = 0
+	buf[2] = 1
 
 	buf[3] = p.CMD
 
@@ -210,7 +219,7 @@ func (c *Cruise) Pack() string {
 	buf := make([]byte, 8)
 	buf[0] = PTZFirstByte
 	buf[1] = getAssembleCode()
-	buf[2] = 0
+	buf[2] = 1
 	buf[3] = c.CMD
 
 	buf[4] = c.GroupNum
