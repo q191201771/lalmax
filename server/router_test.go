@@ -988,3 +988,38 @@ func TestAuthentication(t *testing.T) {
 		}
 	})
 }
+
+// TestWHIPGETNot404 确保浏览器 GET 能命中路由（无 RTC 时为 503，不应为 Gin 默认 404）。
+func TestWHIPGETNot404(t *testing.T) {
+	paths := []string{"/webrtc/whip?streamid=test110"}
+	for _, p := range paths {
+		t.Run(p, func(t *testing.T) {
+			r := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, p, nil)
+			max.router.ServeHTTP(r, req)
+			resp := r.Result()
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				t.Fatalf("GET %s 不应返回 404，请检查 initRtcRouter 是否注册 GET", p)
+			}
+			if resp.StatusCode != http.StatusServiceUnavailable {
+				t.Fatalf("测试环境未启用 RTC，期望 503，实际 %d", resp.StatusCode)
+			}
+		})
+	}
+}
+
+// TestWHEPGETCanonicalPath 规范播放地址 GET /webrtc/whep 应命中路由（无 RTC 时为 503）。
+func TestWHEPGETCanonicalPath(t *testing.T) {
+	r := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/webrtc/whep?streamid=test110", nil)
+	max.router.ServeHTTP(r, req)
+	resp := r.Result()
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		t.Fatal("GET /webrtc/whep 不应 404")
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("测试环境未启用 RTC，期望 503，实际 %d", resp.StatusCode)
+	}
+}
