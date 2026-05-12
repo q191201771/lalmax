@@ -69,20 +69,32 @@ type HookEvent struct {
 }
 
 const (
-	HookEventServerStart    = "on_server_start"
-	HookEventUpdate         = "on_update"
-	HookEventGroupStart     = "on_group_start"
-	HookEventGroupStop      = "on_group_stop"
-	HookEventStreamActive   = "on_stream_active"
-	HookEventPubStart       = "on_pub_start"
-	HookEventPubStop        = "on_pub_stop"
-	HookEventSubStart       = "on_sub_start"
-	HookEventSubStop        = "on_sub_stop"
-	HookEventRelayPullStart = "on_relay_pull_start"
-	HookEventRelayPullStop  = "on_relay_pull_stop"
-	HookEventRtmpConnect    = "on_rtmp_connect"
-	HookEventHlsMakeTs      = "on_hls_make_ts"
+	HookEventServerStart      = "on_server_start"
+	HookEventUpdate           = "on_update"
+	HookEventGroupStart       = "on_group_start"
+	HookEventGroupStop        = "on_group_stop"
+	HookEventStreamActive     = "on_stream_active"
+	HookEventPubStart         = "on_pub_start"
+	HookEventPubStop          = "on_pub_stop"
+	HookEventSubStart         = "on_sub_start"
+	HookEventSubStop          = "on_sub_stop"
+	HookEventRelayPullStart   = "on_relay_pull_start"
+	HookEventRelayPullStop    = "on_relay_pull_stop"
+	HookEventRtmpConnect      = "on_rtmp_connect"
+	HookEventHlsMakeTs        = "on_hls_make_ts"
+	HookEventStreamChanged    = "on_stream_changed"
+	HookEventServerKeepalive  = "on_server_keepalive"
+	HookEventStreamNoneReader = "on_stream_none_reader"
+	HookEventRtpServerTimeout = "on_rtp_server_timeout"
+	HookEventRecordMp4        = "on_record_mp4"
+	HookEventPublish          = "on_publish"
+	HookEventPlay             = "on_play"
+	HookEventStreamNotFound   = "on_stream_not_found"
 )
+
+// SubCountFn 查询指定流当前的 sub 数量
+// 为什么用回调：避免 HttpNotify 直接依赖 lalsvr，保持解耦
+type SubCountFn func(streamName string) int
 
 type HttpNotify struct {
 	cfg config.HttpNotifyConfig
@@ -91,6 +103,8 @@ type HttpNotify struct {
 	stats    *maxlogic.StatAggregator
 
 	client *http.Client
+
+	subCountFn SubCountFn
 
 	eventID     atomic.Int64
 	subID       atomic.Int64
@@ -104,7 +118,45 @@ type HttpNotify struct {
 	httpPosts   map[string]*hookHTTPPostWorker
 }
 
+// SetSubCountFn 注入 sub 数量查询函数，用于 on_stream_none_reader 判断
+func (h *HttpNotify) SetSubCountFn(fn SubCountFn) {
+	h.subCountFn = fn
+}
+
+// UpdateZlmHookConfig 运行时更新 ZLM 兼容 hook 配置
+// 为什么：gb28181 通过 setServerConfig 动态设置 hook URL，需要立即生效
+// 为什么清零原有字段：ZLM 回调与 lalmax 原有回调互斥，避免双重触发
+func (h *HttpNotify) UpdateZlmHookConfig(zlmCfg config.ZlmCompatHookConfig) {
+	h.cfg.ZlmCompatHookConfig = zlmCfg
+	h.cfg.Enable = true
+
+	if h.cfg.HookTimeoutSec > 0 {
+		h.client.Timeout = time.Duration(h.cfg.HookTimeoutSec) * time.Second
+	}
+
+	h.cfg.OnServerStart = ""
+	h.cfg.OnUpdate = ""
+	h.cfg.OnGroupStart = ""
+	h.cfg.OnGroupStop = ""
+	h.cfg.OnStreamActive = ""
+	h.cfg.OnPubStart = ""
+	h.cfg.OnPubStop = ""
+	h.cfg.OnSubStart = ""
+	h.cfg.OnSubStop = ""
+	h.cfg.OnRelayPullStart = ""
+	h.cfg.OnRelayPullStop = ""
+	h.cfg.OnRtmpConnect = ""
+	h.cfg.OnHlsMakeTs = ""
+
+	Log.Infof("zlm compat hook config updated. timeout=%ds, on_stream_changed=%s, on_server_keepalive=%s, on_publish=%s, on_play=%s",
+		h.cfg.HookTimeoutSec, zlmCfg.ZlmOnStreamChanged, zlmCfg.ZlmOnServerKeepalive, zlmCfg.ZlmOnPublish, zlmCfg.ZlmOnPlay)
+}
+
 func NewHttpNotify(cfg config.HttpNotifyConfig, serverId string) *HttpNotify {
+	timeout := notifyTimeoutSec
+	if cfg.HookTimeoutSec > 0 {
+		timeout = cfg.HookTimeoutSec
+	}
 	httpNotify := &HttpNotify{
 		cfg:         cfg,
 		serverId:    serverId,
@@ -114,7 +166,7 @@ func NewHttpNotify(cfg config.HttpNotifyConfig, serverId string) *HttpNotify {
 		plugins:     make(map[string]*hookPluginEntry),
 		httpPosts:   make(map[string]*hookHTTPPostWorker),
 		client: &http.Client{
-			Timeout: time.Duration(notifyTimeoutSec) * time.Second,
+			Timeout: time.Duration(timeout) * time.Second,
 		},
 	}
 	httpNotify.mustRegisterBuiltinHTTPPlugin()
@@ -155,21 +207,83 @@ func (h *HttpNotify) NotifyStreamActive(info HookGroupInfo) {
 func (h *HttpNotify) NotifyPubStart(info base.PubStartInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventPubStart, info)
+
+	if !h.cfg.HasZlmHooks() {
+		return
+	}
+	// --- ZLM 兼容：派生 on_publish + on_stream_changed ---
+	h.publish(HookEventPublish, ZlmOnPublishPayload{
+		MediaServerID: h.serverId,
+		App:           info.AppName,
+		Schema:        info.Protocol,
+		Stream:        info.StreamName,
+		Vhost:         "__defaultVhost__",
+	})
+	h.publish(HookEventStreamChanged, ZlmOnStreamChangedPayload{
+		Regist:        true,
+		App:           info.AppName,
+		Stream:        info.StreamName,
+		AppName:       info.AppName,
+		StreamName:    info.StreamName,
+		Schema:        info.Protocol,
+		MediaServerID: h.serverId,
+		Vhost:         "__defaultVhost__",
+	})
 }
 
 func (h *HttpNotify) NotifyPubStop(info base.PubStopInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventPubStop, info)
+
+	if !h.cfg.HasZlmHooks() {
+		return
+	}
+	// --- ZLM 兼容：派生 on_stream_changed(regist=false) ---
+	h.publish(HookEventStreamChanged, ZlmOnStreamChangedPayload{
+		Regist:        false,
+		App:           info.AppName,
+		Stream:        info.StreamName,
+		AppName:       info.AppName,
+		StreamName:    info.StreamName,
+		Schema:        info.Protocol,
+		MediaServerID: h.serverId,
+		Vhost:         "__defaultVhost__",
+	})
 }
 
 func (h *HttpNotify) NotifySubStart(info base.SubStartInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventSubStart, info)
+
+	if !h.cfg.HasZlmHooks() {
+		return
+	}
+	// --- ZLM 兼容：派生 on_play ---
+	h.publish(HookEventPlay, ZlmOnPlayPayload{
+		MediaServerID: h.serverId,
+		App:           info.AppName,
+		Schema:        info.Protocol,
+		Stream:        info.StreamName,
+		Vhost:         "__defaultVhost__",
+	})
 }
 
 func (h *HttpNotify) NotifySubStop(info base.SubStopInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventSubStop, info)
+
+	if h.cfg.ZlmOnStreamNoneReader == "" || h.subCountFn == nil {
+		return
+	}
+	// 检查该流是否已无观看者，触发 on_stream_none_reader
+	if h.subCountFn(info.StreamName) <= 0 {
+		h.NotifyStreamNoneReader(ZlmOnStreamNoneReaderPayload{
+			App:    info.AppName,
+			Schema: info.Protocol,
+			Stream: info.StreamName,
+			Vhost:  "__defaultVhost__",
+		})
+	}
 }
 
 func (h *HttpNotify) NotifyPullStart(info base.PullStartInfo) {
@@ -190,6 +304,61 @@ func (h *HttpNotify) NotifyRtmpConnect(info base.RtmpConnectInfo) {
 func (h *HttpNotify) NotifyOnHlsMakeTs(info base.HlsMakeTsInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventHlsMakeTs, info)
+}
+
+func (h *HttpNotify) NotifyStreamChanged(info ZlmOnStreamChangedPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventStreamChanged, info)
+}
+
+func (h *HttpNotify) NotifyServerKeepalive() {
+	h.publish(HookEventServerKeepalive, ZlmOnServerKeepalivePayload{
+		MediaServerID: h.serverId,
+	})
+}
+
+func (h *HttpNotify) NotifyStreamNoneReader(info ZlmOnStreamNoneReaderPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventStreamNoneReader, info)
+}
+
+func (h *HttpNotify) NotifyRtpServerTimeout(info ZlmOnRtpServerTimeoutPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventRtpServerTimeout, info)
+}
+
+func (h *HttpNotify) NotifyRecordMp4(info ZlmOnRecordMp4Payload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventRecordMp4, info)
+}
+
+func (h *HttpNotify) NotifyPublish(info ZlmOnPublishPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventPublish, info)
+}
+
+func (h *HttpNotify) NotifyPlay(info ZlmOnPlayPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventPlay, info)
+}
+
+func (h *HttpNotify) NotifyStreamNotFound(info ZlmOnStreamNotFoundPayload) {
+	if info.MediaServerID == "" {
+		info.MediaServerID = h.serverId
+	}
+	h.publish(HookEventStreamNotFound, info)
 }
 
 // ----- implement INotifyHandler interface ----------------------------------------------------------------------------
@@ -496,6 +665,38 @@ func populateHookEventMeta(event *HookEvent, info interface{}) {
 		event.appName = v.App
 	case base.HlsMakeTsInfo:
 		event.streamName = v.StreamName
+	case ZlmOnStreamChangedPayload:
+		event.appName = v.App
+		event.streamName = v.Stream
+		if event.appName == "" {
+			event.appName = v.AppName
+		}
+		if event.streamName == "" {
+			event.streamName = v.StreamName
+		}
+	case ZlmOnStreamNoneReaderPayload:
+		event.appName = v.App
+		event.streamName = v.Stream
+	case ZlmOnRtpServerTimeoutPayload:
+		event.streamName = v.StreamID
+	case ZlmOnRecordMp4Payload:
+		event.appName = v.App
+		event.streamName = v.Stream
+	case ZlmOnPublishPayload:
+		event.appName = v.App
+		event.streamName = v.Stream
+	case ZlmOnPlayPayload:
+		event.appName = v.App
+		event.streamName = v.Stream
+	case ZlmOnStreamNotFoundPayload:
+		event.appName = v.App
+		event.streamName = v.Stream
+		if event.appName == "" {
+			event.appName = v.AppName
+		}
+		if event.streamName == "" {
+			event.streamName = v.StreamName
+		}
 	}
 }
 

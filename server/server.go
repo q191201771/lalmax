@@ -39,6 +39,7 @@ type LalMaxServer struct {
 	httpfmp4svr *httpfmp4.HttpFmp4Server
 	hlssvr      *hls.HlsServer
 	rtpPubMgr   *rtppub.Manager
+	recorder    *ffmpegRecorder
 }
 
 func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
@@ -58,7 +59,18 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 		stats:     maxlogic.NewStatAggregator(maxlogic.GetGroupManagerInstance()),
 		notifyHub: notifyHub,
 		rtpPubMgr: rtppub.NewManager(lalsvr, conf.GB28181Config.MediaConfig),
+		recorder:  newFfmpegRecorder(""),
 	}
+
+	// 注入 sub 数量查询，用于 on_stream_none_reader 判断
+	notifyHub.SetSubCountFn(func(streamName string) int {
+		for _, g := range lalsvr.StatAllGroup() {
+			if g.StreamName == streamName {
+				return len(g.StatSubs)
+			}
+		}
+		return 0
+	})
 
 	if conf.SrtConfig.Enable {
 		maxsvr.srtsvr = srt.NewSrtServer(conf.SrtConfig.Addr, lalsvr, func(option *srt.SrtOption) {
@@ -74,6 +86,15 @@ func NewLalMaxServer(conf *config.Config) (*LalMaxServer, error) {
 			nazalog.Error("create rtc svr failed, err:", err)
 			return nil, err
 		}
+		maxsvr.rtcsvr.SetStreamNotFoundFn(func(app, stream, schema string) {
+			notifyHub.NotifyStreamNotFound(ZlmOnStreamNotFoundPayload{
+				MediaServerID: conf.ServerId,
+				App:           app,
+				Stream:        stream,
+				Schema:        schema,
+				Vhost:         "__defaultVhost__",
+			})
+		})
 	}
 
 	if conf.Fmp4Config.Http.Enable {
@@ -133,6 +154,7 @@ func (s *LalMaxServer) Run() (err error) {
 	}
 
 	go s.runPeriodicUpdate(ctx)
+	go s.runPeriodicKeepalive(ctx)
 
 	go func() {
 		nazalog.Infof("lalmax http listen. addr=%s", s.conf.HttpConfig.ListenAddr)
@@ -175,6 +197,30 @@ func (s *LalMaxServer) runPeriodicUpdate(ctx context.Context) {
 			s.notifyHub.NotifyUpdate(base.UpdateInfo{
 				Groups: s.lalsvr.StatAllGroup(),
 			})
+		}
+	}
+}
+
+// runPeriodicKeepalive ZLM 兼容：定时发送 on_server_keepalive
+func (s *LalMaxServer) runPeriodicKeepalive(ctx context.Context) {
+	if s == nil || s.notifyHub == nil {
+		return
+	}
+
+	intervalSec := s.conf.HttpNotifyConfig.KeepaliveIntervalSec
+	if intervalSec <= 0 {
+		return
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalSec) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.notifyHub.NotifyServerKeepalive()
 		}
 	}
 }

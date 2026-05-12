@@ -2,6 +2,7 @@ package logic
 
 import (
 	"sync"
+	"time"
 
 	"github.com/q191201771/lalmax/fmp4/hls"
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -209,6 +210,21 @@ func (m *ComplexGroupManager) getGroupLocked(key StreamKey) (bool, *Group) {
 
 func (m *ComplexGroupManager) GetGroupByStreamName(streamName string) (bool, *Group) {
 	return m.GetGroup(StreamKeyFromStreamName(streamName))
+}
+
+// WaitGroup 等待流就绪，轮询 interval 间隔，总超时 timeout
+// 为什么：GB28181 设备推流有延迟，播放端先于推流端到达，需短暂等待
+func (m *ComplexGroupManager) WaitGroup(key StreamKey, interval, timeout time.Duration) (bool, *Group) {
+	deadline := time.Now().Add(timeout)
+	for {
+		if ok, g := m.GetGroup(key); ok {
+			return true, g
+		}
+		if time.Now().After(deadline) {
+			return false, nil
+		}
+		time.Sleep(interval)
+	}
 }
 
 // streamName 单独查找只在匹配唯一 appName 时成功，避免跨 app 串流。

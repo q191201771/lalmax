@@ -24,6 +24,9 @@ func (p *hookBuiltinHTTPPlugin) OnHookEvent(event HookEvent) error {
 		if p.hub.cfg.OnServerStart != "" {
 			p.hub.asyncPostEvent(p.hub.cfg.OnServerStart, event)
 		}
+		if p.hub.cfg.ZlmOnServerStarted != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnServerStarted, event)
+		}
 	case HookEventUpdate:
 		if p.hub.cfg.OnUpdate != "" {
 			p.hub.asyncPostEvent(p.hub.cfg.OnUpdate, event)
@@ -71,6 +74,38 @@ func (p *hookBuiltinHTTPPlugin) OnHookEvent(event HookEvent) error {
 	case HookEventHlsMakeTs:
 		if p.hub.cfg.OnHlsMakeTs != "" {
 			p.hub.asyncPostEvent(p.hub.cfg.OnHlsMakeTs, event)
+		}
+	case HookEventStreamChanged:
+		if p.hub.cfg.ZlmOnStreamChanged != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamChanged, event)
+		}
+	case HookEventServerKeepalive:
+		if p.hub.cfg.ZlmOnServerKeepalive != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnServerKeepalive, event)
+		}
+	case HookEventStreamNoneReader:
+		if p.hub.cfg.ZlmOnStreamNoneReader != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamNoneReader, event)
+		}
+	case HookEventRtpServerTimeout:
+		if p.hub.cfg.ZlmOnRtpServerTimeout != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnRtpServerTimeout, event)
+		}
+	case HookEventRecordMp4:
+		if p.hub.cfg.ZlmOnRecordMp4 != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnRecordMp4, event)
+		}
+	case HookEventPublish:
+		if p.hub.cfg.ZlmOnPublish != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnPublish, event)
+		}
+	case HookEventPlay:
+		if p.hub.cfg.ZlmOnPlay != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnPlay, event)
+		}
+	case HookEventStreamNotFound:
+		if p.hub.cfg.ZlmOnStreamNotFound != "" {
+			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamNotFound, event)
 		}
 	}
 

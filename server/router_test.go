@@ -399,7 +399,8 @@ func TestStopRelayPullAllowsGet(t *testing.T) {
 
 func TestHookHubRecentAndSubscribe(t *testing.T) {
 	hub := NewHttpNotify(config.HttpNotifyConfig{}, "hub-test")
-	_, ch, cancel := hub.Subscribe(1)
+	// NotifyPubStart 会派生 on_stream_changed，需要足够缓冲
+	_, ch, cancel := hub.Subscribe(8)
 	defer cancel()
 
 	hub.NotifyPubStart(base.PubStartInfo{})
@@ -413,12 +414,16 @@ func TestHookHubRecentAndSubscribe(t *testing.T) {
 		t.Fatal("wait hook event timeout")
 	}
 
-	events := hub.Recent(1)
-	if len(events) != 1 {
-		t.Fatalf("unexpected recent len: %d", len(events))
+	events := hub.Recent(0)
+	found := false
+	for _, e := range events {
+		if e.Event == HookEventPubStart {
+			found = true
+			break
+		}
 	}
-	if events[0].Event != HookEventPubStart {
-		t.Fatalf("unexpected recent event: %+v", events[0])
+	if !found {
+		t.Fatalf("on_pub_start not found in recent events")
 	}
 }
 
@@ -755,7 +760,8 @@ func TestHookRecentEndpoint(t *testing.T) {
 	svr.notifyHub.NotifyPubStop(base.PubStopInfo{})
 
 	r := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/api/hook/recent?limit=1", nil)
+	// 用 event filter 精确查询，因为 NotifyPubStop 会派生 on_stream_changed
+	req := httptest.NewRequest("GET", "/api/hook/recent?limit=10&event=on_pub_stop", nil)
 	svr.router.ServeHTTP(r, req)
 	resp := r.Result()
 	if resp.StatusCode != http.StatusOK {
@@ -774,8 +780,8 @@ func TestHookRecentEndpoint(t *testing.T) {
 	if out.ErrorCode != base.ErrorCodeSucc {
 		t.Fatalf("unexpected response: %+v", out)
 	}
-	if len(out.Data.Events) != 1 {
-		t.Fatalf("unexpected event count: %d", len(out.Data.Events))
+	if len(out.Data.Events) < 1 {
+		t.Fatalf("expected at least 1 on_pub_stop event, got: %d", len(out.Data.Events))
 	}
 	if out.Data.Events[0].Event != HookEventPubStop {
 		t.Fatalf("unexpected event: %+v", out.Data.Events[0])

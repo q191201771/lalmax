@@ -28,6 +28,7 @@ func main() {
 	}
 
 	maxConf := config.GetConfig()
+	maxConf.ConfFilePath = confFilename
 
 	svr, err := server.NewLalMaxServer(maxConf)
 	if err != nil {

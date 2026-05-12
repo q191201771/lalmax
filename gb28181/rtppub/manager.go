@@ -193,6 +193,16 @@ func (m *Manager) CheckSsrc(ssrc uint32) (*mediaserver.MediaInfo, bool) {
 func (m *Manager) NotifyClose(streamName string) {
 }
 
+// UpdatePortRange 动态更新端口范围，由 setServerConfig 接口调用
+// 为什么：owl 通过 setServerConfig 下发 rtp_proxy.port_range，需运行时生效
+func (m *Manager) UpdatePortRange(portMin, portMax int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.portMin = portMin
+	m.portMax = portMax
+	nazalog.Infof("rtp pub port range updated. min=%d, max=%d", portMin, portMax)
+}
+
 func (m *Manager) OnRtpPacket(streamName string, mediaKey string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

@@ -2,7 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
 )
 
 var defaultConfig Config
@@ -18,6 +20,7 @@ type Config struct {
 	LalSvrConfigPath string           `json:"lal_config_path"` // lal配置文件路径，兼容旧版配置
 	LogicConfig      LogicConfig      `json:"logic_config"`    // 扩展流组配置
 	LalRawContent    []byte           `json:"-"`               // lal 原始配置内容
+	ConfFilePath     string           `json:"-"`               // 配置文件路径，用于持久化
 }
 
 type SrtConfig struct {
@@ -85,22 +88,54 @@ type GB28181MediaConfig struct {
 	MultiPortMaxIncrement uint16 `json:"multi_port_max_increment"` // 多端口范围 ListenPort+1至ListenPort+MultiPortMax
 }
 
+// ZlmCompatHookConfig ZLM 兼容 hook URL 配置
+// 为什么独立结构体：隔离 ZLM 适配层，lalmax 原有字段保持不变
+type ZlmCompatHookConfig struct {
+	ZlmOnStreamChanged    string `json:"zlm_on_stream_changed"`
+	ZlmOnServerKeepalive  string `json:"zlm_on_server_keepalive"`
+	ZlmOnStreamNoneReader string `json:"zlm_on_stream_none_reader"`
+	ZlmOnRtpServerTimeout string `json:"zlm_on_rtp_server_timeout"`
+	ZlmOnRecordMp4        string `json:"zlm_on_record_mp4"`
+	ZlmOnPublish          string `json:"zlm_on_publish"`
+	ZlmOnPlay             string `json:"zlm_on_play"`
+	ZlmOnStreamNotFound   string `json:"zlm_on_stream_not_found"`
+	ZlmOnServerStarted    string `json:"zlm_on_server_started"`
+}
+
+// HasZlmHooks 任一 ZLM 兼容 hook 字段有值即返回 true
+// 为什么：ZLM 回调与 lalmax 原有回调二选一，此方法为判断条件
+func (c ZlmCompatHookConfig) HasZlmHooks() bool {
+	return c.ZlmOnStreamChanged != "" ||
+		c.ZlmOnServerKeepalive != "" ||
+		c.ZlmOnStreamNoneReader != "" ||
+		c.ZlmOnRtpServerTimeout != "" ||
+		c.ZlmOnRecordMp4 != "" ||
+		c.ZlmOnPublish != "" ||
+		c.ZlmOnPlay != "" ||
+		c.ZlmOnStreamNotFound != ""
+}
+
 type HttpNotifyConfig struct {
-	Enable            bool   `json:"enable"`
-	UpdateIntervalSec int    `json:"update_interval_sec"`
-	OnServerStart     string `json:"on_server_start"`
-	OnUpdate          string `json:"on_update"`
-	OnGroupStart      string `json:"on_group_start"`
-	OnGroupStop       string `json:"on_group_stop"`
-	OnStreamActive    string `json:"on_stream_active"`
-	OnPubStart        string `json:"on_pub_start"`
-	OnPubStop         string `json:"on_pub_stop"`
-	OnSubStart        string `json:"on_sub_start"`
-	OnSubStop         string `json:"on_sub_stop"`
-	OnRelayPullStart  string `json:"on_relay_pull_start"`
-	OnRelayPullStop   string `json:"on_relay_pull_stop"`
-	OnRtmpConnect     string `json:"on_rtmp_connect"`
-	OnHlsMakeTs       string `json:"on_hls_make_ts"`
+	Enable               bool   `json:"enable"`
+	UpdateIntervalSec    int    `json:"update_interval_sec"`
+	KeepaliveIntervalSec int    `json:"keepalive_interval_sec"`
+	HookTimeoutSec       int    `json:"hook_timeout_sec"`
+	OnServerStart        string `json:"on_server_start"`
+	OnUpdate             string `json:"on_update"`
+	OnGroupStart         string `json:"on_group_start"`
+	OnGroupStop          string `json:"on_group_stop"`
+	OnStreamActive       string `json:"on_stream_active"`
+	OnPubStart           string `json:"on_pub_start"`
+	OnPubStop            string `json:"on_pub_stop"`
+	OnSubStart           string `json:"on_sub_start"`
+	OnSubStop            string `json:"on_sub_stop"`
+	OnRelayPullStart     string `json:"on_relay_pull_start"`
+	OnRelayPullStop      string `json:"on_relay_pull_stop"`
+	OnRtmpConnect        string `json:"on_rtmp_connect"`
+	OnHlsMakeTs          string `json:"on_hls_make_ts"`
+
+	// --- ZLM 兼容 hook 配置 ---
+	ZlmCompatHookConfig
 }
 
 type LogicConfig struct {
@@ -188,4 +223,36 @@ func unmarshalConfig(data []byte, cfg *Config) error {
 
 func GetConfig() *Config {
 	return &defaultConfig
+}
+
+// SaveToFile 将当前配置持久化到配置文件
+// 为什么：setServerConfig 动态修改后需落盘，重启后配置仍生效
+func (c *Config) SaveToFile() error {
+	if c.ConfFilePath == "" {
+		return nil
+	}
+
+	data, err := os.ReadFile(c.ConfFilePath)
+	if err != nil {
+		return fmt.Errorf("read config file: %w", err)
+	}
+
+	var file map[string]json.RawMessage
+	if err := json.Unmarshal(data, &file); err != nil {
+		return fmt.Errorf("parse config file: %w", err)
+	}
+
+	lalmax, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal lalmax config: %w", err)
+	}
+	file["lalmax"] = lalmax
+
+	out, err := json.MarshalIndent(file, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal config file: %w", err)
+	}
+	out = append(out, '\n')
+
+	return os.WriteFile(c.ConfFilePath, out, 0o644)
 }

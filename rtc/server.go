@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	config "github.com/q191201771/lalmax/config"
+	maxlogic "github.com/q191201771/lalmax/logic"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pion/ice/v2"
@@ -14,11 +16,37 @@ import (
 	"github.com/q191201771/naza/pkg/nazalog"
 )
 
+// StreamNotFoundFn 流不存在时的回调，触发 on_stream_not_found 通知上层拉流
+type StreamNotFoundFn func(app, stream, schema string)
+
 type RtcServer struct {
-	config    config.RtcConfig
-	lalServer logic.ILalServer
-	udpMux    ice.UDPMux
-	tcpMux    ice.TCPMux
+	config           config.RtcConfig
+	lalServer        logic.ILalServer
+	udpMux           ice.UDPMux
+	tcpMux           ice.TCPMux
+	streamNotFoundFn StreamNotFoundFn
+}
+
+// SetStreamNotFoundFn 注入流不存在回调
+func (s *RtcServer) SetStreamNotFoundFn(fn StreamNotFoundFn) {
+	s.streamNotFoundFn = fn
+}
+
+// waitStreamReady 触发 on_stream_not_found 后轮询等待流就绪
+// 为什么：WebRTC 播放请求先于 GB28181 设备推流到达，需通知上层拉流后等待
+func (s *RtcServer) waitStreamReady(appName, streamid, schema string) bool {
+	key := maxlogic.NewStreamKey(appName, streamid)
+	if ok, _ := maxlogic.GetGroupManagerInstance().GetGroup(key); ok {
+		return true
+	}
+
+	if s.streamNotFoundFn != nil {
+		nazalog.Infof("stream not found, triggering on_stream_not_found. app=%s, stream=%s", appName, streamid)
+		s.streamNotFoundFn(appName, streamid, schema)
+	}
+
+	ok, _ := maxlogic.GetGroupManagerInstance().WaitGroup(key, 500*time.Millisecond, 5*time.Second)
+	return ok
 }
 
 func NewRtcServer(config config.RtcConfig, lal logic.ILalServer) (*RtcServer, error) {
@@ -157,6 +185,12 @@ func (s *RtcServer) HandleJessibuca(c *gin.Context) {
 		return
 	}
 
+	if !s.waitStreamReady(appName, streamid, "rtsp") {
+		nazalog.Errorf("stream not ready after waiting. app=%s, stream=%s", appName, streamid)
+		c.Status(http.StatusNotFound)
+		return
+	}
+
 	pc, err := newPeerConnection(s.config.ICEHostNATToIPs, s.udpMux, s.tcpMux)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -227,6 +261,12 @@ func (s *RtcServer) HandleWHEP(c *gin.Context) {
 		return
 	}
 
+	if !s.waitStreamReady(appName, streamid, "rtsp") {
+		nazalog.Errorf("stream not ready after waiting. app=%s, stream=%s", appName, streamid)
+		c.Status(http.StatusNotFound)
+		return
+	}
+
 	pc, err := newPeerConnection(s.config.ICEHostNATToIPs, s.udpMux, s.tcpMux)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -252,4 +292,32 @@ func (s *RtcServer) HandleWHEP(c *gin.Context) {
 	go whepsession.Run()
 
 	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
+}
+
+// HandleZlmWebrtcPlay ZLM 兼容 WebRTC 播放，返回 SDP answer
+// 为什么独立方法：ZLM 信令格式为 JSON {"code":0,"sdp":"..."}，与 WHEP 纯 SDP 不同
+func (s *RtcServer) HandleZlmWebrtcPlay(app, stream, offer string) (string, error) {
+	if !s.waitStreamReady(app, stream, "rtsp") {
+		return "", fmt.Errorf("stream not found: %s/%s", app, stream)
+	}
+
+	pc, err := newPeerConnection(s.config.ICEHostNATToIPs, s.udpMux, s.tcpMux)
+	if err != nil {
+		return "", fmt.Errorf("create peer connection: %w", err)
+	}
+
+	session := NewWhepSession(app, stream, s.config.WriteChanSize, pc, s.lalServer)
+	if session == nil {
+		pc.Close()
+		return "", fmt.Errorf("create session failed: %s/%s", app, stream)
+	}
+
+	sdp := session.GetAnswerSDP(offer)
+	if sdp == "" {
+		session.Close()
+		return "", fmt.Errorf("generate answer sdp failed")
+	}
+
+	go session.Run()
+	return sdp, nil
 }
