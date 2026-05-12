@@ -143,6 +143,27 @@ func (s *RtcServer) HandleWHIP(c *gin.Context) {
 
 	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
 }
+
+// ServeWHIPPublishPage 返回内嵌推流页：浏览器直接打开 WHIP URL 即可通过 WHIP POST 建立 WebRTC 推流（与 ServeWHEPPlayPage 对称）。
+func (s *RtcServer) ServeWHIPPublishPage(c *gin.Context) {
+	if c.Request.URL.Query().Get("streamid") == "" {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusBadRequest, "<!doctype html><meta charset=utf-8><title>WHIP</title><p>缺少查询参数 <code>streamid</code>。示例：<code>/webrtc/whip?streamid=test110</code></p>")
+		return
+	}
+	c.Header("Cache-Control", "no-store")
+	c.Header("Accept-Post", "application/sdp")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	c.Header("Access-Control-Expose-Headers", "Location")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(buildWHIPPublishHTML()))
+}
+
+func buildWHIPPublishHTML() string {
+	return "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>WHIP Publisher</title><style>body{margin:0;background:#0f172a;color:#e2e8f0;font:14px/1.4 system-ui}main{max-width:960px;margin:0 auto;padding:24px}video{width:100%;max-height:360px;background:#000;border-radius:12px}pre{white-space:pre-wrap;background:#111827;padding:12px;border-radius:12px;min-height:72px}</style></head><body><main><p>本页使用摄像头/麦克风通过 WHIP 推流（H264+Opus）。请允许浏览器媒体权限。</p><video id=\"preview\" autoplay muted playsinline></video><pre id=\"log\">connecting...</pre></main><script>(async()=>{const log=(m)=>{document.getElementById('log').textContent=m};const preview=document.getElementById('preview');try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){log('当前环境不支持 getUserMedia');return}const stream=await navigator.mediaDevices.getUserMedia({video:true,audio:true});preview.srcObject=stream;const pc=new RTCPeerConnection();stream.getTracks().forEach(t=>pc.addTrack(t,stream));const offer=await pc.createOffer();await pc.setLocalDescription(offer);await new Promise(r=>{if(pc.iceGatheringState==='complete')return r();pc.addEventListener('icegatheringstatechange',()=>{if(pc.iceGatheringState==='complete')r()})});const res=await fetch(location.href,{method:'POST',headers:{'Content-Type':'application/sdp'},body:pc.localDescription.sdp});if(!res.ok){log('WHIP 失败: '+res.status+' '+await res.text());return}const answer=await res.text();await pc.setRemoteDescription({type:'answer',sdp:answer});log('WHIP 已连接，正在推流: '+location.href)}catch(e){log('错误: '+(e&&e.message?e.message:String(e)))}})();</script></body></html>"
+}
+
 func (s *RtcServer) HandleJessibuca(c *gin.Context) {
 	streamid := c.Param("streamid")
 	if streamid == "" {
@@ -196,6 +217,29 @@ func (s *RtcServer) HandleJessibuca(c *gin.Context) {
 
 	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
 }
+
+// ServeWHEPPlayPage 返回内嵌播放页（与 topsmedia/pkg/httpflv handleWHEPPage + buildWHEPPage 对齐）。规范地址：GET /webrtc/whep?streamid=...
+func (s *RtcServer) ServeWHEPPlayPage(c *gin.Context) {
+	if c.Request.URL.Query().Get("streamid") == "" {
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusBadRequest, "<!doctype html><meta charset=utf-8><title>WHEP</title><p>缺少查询参数 <code>streamid</code>。示例：<code>/webrtc/whep?streamid=test110</code> 或带 <code>app_name</code>：<code>/webrtc/whep?streamid=live/test110&amp;app_name=live</code></p>")
+		return
+	}
+	// 与 httpflv.handleWHEPPage 响应头一致（Gin 由框架管理 Connection，不设 close）
+	c.Header("Cache-Control", "no-store")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+	c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	c.Header("Access-Control-Expose-Headers", "Location")
+	c.Header("Accept-Post", "application/sdp")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(buildWHEPPlayHTML()))
+}
+
+// buildWHEPPlayHTML 与 topsmedia/pkg/httpflv buildWHEPPage 内嵌脚本与结构保持一致。
+func buildWHEPPlayHTML() string {
+	return "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>WHEP Player</title><style>body{margin:0;background:#0f172a;color:#e2e8f0;font:14px/1.4 system-ui}main{max-width:960px;margin:0 auto;padding:24px}video{width:100%;background:#000;border-radius:12px}pre{white-space:pre-wrap;background:#111827;padding:12px;border-radius:12px;min-height:72px}</style></head><body><main><video id=\"video\" autoplay playsinline controls muted></video><pre id=\"log\">connecting...</pre></main><script>(async()=>{const log=(m)=>document.getElementById('log').textContent=m;const video=document.getElementById('video');const pc=new RTCPeerConnection();pc.ontrack=(e)=>{video.srcObject=e.streams[0];};pc.addTransceiver('video',{direction:'recvonly'});pc.addTransceiver('audio',{direction:'recvonly'});const offer=await pc.createOffer();await pc.setLocalDescription(offer);await new Promise(r=>{if(pc.iceGatheringState==='complete')return r();pc.addEventListener('icegatheringstatechange',()=>pc.iceGatheringState==='complete'&&r(),{once:false});});const res=await fetch(location.href,{method:'POST',headers:{'Content-Type':'application/sdp'},body:pc.localDescription.sdp});if(!res.ok){log('whep failed: '+res.status+' '+await res.text());return;}const answer=await res.text();await pc.setRemoteDescription({type:'answer',sdp:answer});log('connected: '+location.href);})();</script></body></html>"
+}
+
 func (s *RtcServer) HandleWHEP(c *gin.Context) {
 	streamid := c.Request.URL.Query().Get("streamid")
 	if streamid == "" {
