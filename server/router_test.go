@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -376,6 +377,98 @@ func TestStatGroupIncludesLalmaxExtSubsRuntimeFields(t *testing.T) {
 	}
 	if stat.ReadBytesSum != 1024 || stat.WroteBytesSum != 2048 {
 		t.Fatalf("unexpected bytes stat: %+v", stat)
+	}
+}
+
+func TestStatGroupIncludesLalmaxExtPub(t *testing.T) {
+	streamName := uniqueTestName("test_stat_group_ext_pub")
+
+	_, err := max.lalsvr.AddCustomizePubSession(streamName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ok, ss := maxlogic.GetGroupManagerInstance().GetGroupByStreamName(streamName)
+	if !ok || ss == nil {
+		t.Fatal("lalmax group not found")
+	}
+	const publisherID = "whip-pub-test"
+	ss.AddPublisher(maxlogic.PublisherInfo{
+		PublisherID: publisherID,
+		Protocol:    maxlogic.PublisherProtocolWHIP,
+		RemoteAddr:  "10.0.0.2:8000",
+	}, &statPublisherStub{
+		stat: maxlogic.PublisherStat{ReadBytesSum: 5120},
+	})
+
+	r := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/api/stat/group?stream_name="+streamName, nil)
+	max.router.ServeHTTP(r, req)
+	resp := r.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal(resp.Status)
+	}
+
+	var out ApiStatGroupResp
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorCode != base.ErrorCodeSucc {
+		t.Fatalf("unexpected response: %+v", out)
+	}
+	if out.Data == nil {
+		t.Fatal("group data is nil")
+	}
+	if out.Data.StatPub.SessionId != publisherID {
+		t.Fatalf("unexpected merged pub: %+v", out.Data.StatPub)
+	}
+	if out.Data.StatPub.Protocol != maxlogic.PublisherProtocolWHIP {
+		t.Fatalf("unexpected merged pub protocol: %+v", out.Data.StatPub)
+	}
+	if out.Data.Lalmax.ExtPub.SessionId != publisherID {
+		t.Fatalf("unexpected ext_pub: %+v", out.Data.Lalmax.ExtPub)
+	}
+	if out.Data.Lalmax.ExtPub.RemoteAddr != "10.0.0.2:8000" {
+		t.Fatalf("unexpected ext_pub remote addr: %+v", out.Data.Lalmax.ExtPub)
+	}
+	if out.Data.Lalmax.ExtPub.ReadBytesSum != 5120 {
+		t.Fatalf("unexpected ext_pub read bytes: %+v", out.Data.Lalmax.ExtPub)
+	}
+}
+
+type statPublisherStub struct {
+	stat maxlogic.PublisherStat
+}
+
+func (p *statPublisherStub) GetPublisherStat() maxlogic.PublisherStat {
+	return p.stat
+}
+
+func TestKickCustomizePubViaAPI(t *testing.T) {
+	kicked := false
+	maxlogic.RegisterCustomizePub("kick-stream", "CUSTOMIZEPUB-kick", "", func() { kicked = true })
+	defer maxlogic.UnregisterCustomizePub("CUSTOMIZEPUB-kick", "")
+
+	r := httptest.NewRecorder()
+	body := `{"stream_name":"kick-stream","session_id":"CUSTOMIZEPUB-kick"}`
+	req := httptest.NewRequest("POST", "/api/ctrl/kick_session", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	max.router.ServeHTTP(r, req)
+
+	resp := r.Result()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatal(resp.Status)
+	}
+
+	var out base.ApiCtrlKickSessionResp
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ErrorCode != base.ErrorCodeSucc {
+		t.Fatalf("unexpected kick response: %+v", out)
+	}
+	if !kicked {
+		t.Fatal("expected customize pub kick callback")
 	}
 }
 

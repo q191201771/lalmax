@@ -768,3 +768,66 @@ func TestStatSubscribersRefreshRuntimeStats(t *testing.T) {
 		t.Fatalf("write bitrate after increment = %d, want 8", stat.WriteBitrateKbits)
 	}
 }
+
+type statPublisher struct {
+	stat PublisherStat
+}
+
+func (p *statPublisher) GetPublisherStat() PublisherStat {
+	return p.stat
+}
+
+func TestStatPublisherRefreshRuntimeStats(t *testing.T) {
+	group := newTestGroup("test-publisher-stat")
+	defer GetGroupManagerInstance().RemoveGroupByStreamName("test-publisher-stat")
+
+	pub := &statPublisher{}
+	pub.stat = PublisherStat{
+		RemoteAddr:   "127.0.0.1:8000",
+		ReadBytesSum: 4096,
+	}
+	group.AddPublisher(PublisherInfo{
+		PublisherID: "CUSTOMIZEPUB1",
+		Protocol:    PublisherProtocolWHIP,
+	}, pub)
+
+	stat := group.StatPublisher()
+	if stat.SessionId != "CUSTOMIZEPUB1" {
+		t.Fatalf("session id = %s, want CUSTOMIZEPUB1", stat.SessionId)
+	}
+	if stat.Protocol != PublisherProtocolWHIP {
+		t.Fatalf("protocol = %s, want WHIP", stat.Protocol)
+	}
+	if stat.BaseType != base.SessionBaseTypePubStr {
+		t.Fatalf("base type = %s, want PUB", stat.BaseType)
+	}
+	if stat.RemoteAddr != "127.0.0.1:8000" {
+		t.Fatalf("remote addr = %s, want 127.0.0.1:8000", stat.RemoteAddr)
+	}
+	if stat.ReadBytesSum != 4096 {
+		t.Fatalf("read bytes = %d, want 4096", stat.ReadBytesSum)
+	}
+
+	group.publisherMux.RLock()
+	state := group.publisher
+	group.publisherMux.RUnlock()
+	state.refreshStat(2)
+
+	pub.stat.ReadBytesSum = 8192
+	sessionStat := state.refreshStat(2)
+	if sessionStat.ReadBytesSum != 8192 {
+		t.Fatalf("read bytes after increment = %d, want 8192", sessionStat.ReadBytesSum)
+	}
+	if sessionStat.ReadBitrateKbits != 16 {
+		t.Fatalf("read bitrate = %d, want 16", sessionStat.ReadBitrateKbits)
+	}
+	if sessionStat.BitrateKbits != 16 {
+		t.Fatalf("bitrate = %d, want 16", sessionStat.BitrateKbits)
+	}
+
+	group.RemovePublisher("CUSTOMIZEPUB1")
+	stat = group.StatPublisher()
+	if stat.SessionId != "" {
+		t.Fatalf("expected empty publisher stat after remove, got %+v", stat)
+	}
+}

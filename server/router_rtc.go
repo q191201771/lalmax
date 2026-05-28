@@ -8,10 +8,14 @@ import (
 
 func (s *LalMaxServer) initRtcRouter(router *gin.Engine) {
 	rtc := router.Group("/webrtc")
+	rtc.DELETE("/whip/:resourceId", s.HandleWHIPResource)
 	rtc.GET("/whip", s.HandleWHIP)
 	rtc.POST("/whip", s.HandleWHIP)
 	rtc.OPTIONS("/whip", s.HandleWHIP)
 	rtc.DELETE("/whip", s.HandleWHIP)
+
+	// 兼容 Location 旧格式 whip/{uuid} 被解析到根路径的情况
+	router.DELETE("/whip/:resourceId", s.HandleWHIPResource)
 
 	rtc.GET("/whep", s.HandleWHEP)
 	rtc.POST("/whep", s.HandleWHEP)
@@ -46,9 +50,16 @@ func (s *LalMaxServer) HandleWHIP(c *gin.Context) {
 		c.Header("Accept-Post", "application/sdp")
 		c.Status(http.StatusNoContent)
 	case "DELETE":
-		// TODO 实现 DELETE
-		c.Status(http.StatusOK)
+		c.Status(http.StatusBadRequest)
 	}
+}
+
+func (s *LalMaxServer) HandleWHIPResource(c *gin.Context) {
+	if s.rtcsvr != nil {
+		s.rtcsvr.HandleWHIPDelete(c)
+		return
+	}
+	c.Status(http.StatusServiceUnavailable)
 }
 
 func (s *LalMaxServer) HandleWHEP(c *gin.Context) {

@@ -129,8 +129,9 @@ func (s *RtcServer) HandleWHIP(c *gin.Context) {
 		pc.Close()
 		return
 	}
+	whipsession.bindRegistry()
 
-	c.Header("Location", fmt.Sprintf("whip/%s", whipsession.subscriberId))
+	c.Header("Location", fmt.Sprintf("/webrtc/whip/%s", whipsession.subscriberId))
 
 	sdp := whipsession.GetAnswerSDP(string(body))
 	if sdp == "" {
@@ -142,6 +143,19 @@ func (s *RtcServer) HandleWHIP(c *gin.Context) {
 	go whipsession.Run()
 
 	c.Data(http.StatusCreated, "application/sdp", []byte(sdp))
+}
+
+func (s *RtcServer) HandleWHIPDelete(c *gin.Context) {
+	resourceID := c.Param("resourceId")
+	if resourceID == "" {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if maxlogic.KickCustomizePub("", resourceID) {
+		c.Status(http.StatusOK)
+		return
+	}
+	c.Status(http.StatusNotFound)
 }
 
 // ServeWHIPPublishPage 返回内嵌推流页：浏览器直接打开 WHIP URL 即可通过 WHIP POST 建立 WebRTC 推流（与 ServeWHEPPlayPage 对称）。

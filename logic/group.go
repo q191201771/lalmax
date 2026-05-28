@@ -19,6 +19,9 @@ const (
 	SubscriberProtocolJessibuca = "JESSIBUCA"
 	SubscriberProtocolHTTPFMP4  = "HTTP-FMP4"
 	SubscriberProtocolSRT       = "SRT"
+
+	PublisherProtocolWHIP = "WHIP"
+	PublisherProtocolSRT  = "SRT"
 )
 
 type Subscriber interface {
@@ -38,7 +41,13 @@ type SubscriberInfo struct {
 	RemoteAddr   string
 }
 
-// Group 只维护 lalmax 侧订阅者和回放缓存，推流状态仍以 lal 为准。
+type PublisherInfo struct {
+	PublisherID string
+	Protocol    string
+	RemoteAddr  string
+}
+
+// Group 维护 lalmax 侧订阅者、扩展推流者和回放缓存；lal 原生 pub 仍由 lal 负责。
 type Group struct {
 	uniqueKey      string
 	key            StreamKey
@@ -55,6 +64,8 @@ type Group struct {
 	lifecycleMux   sync.RWMutex
 	stopOnce       sync.Once
 	msgMux         sync.Mutex
+	publisherMux   sync.RWMutex
+	publisher      *publisherState
 	activeHookSent bool
 	hasVideo       bool
 	closed         atomic.Bool
@@ -69,6 +80,18 @@ type subscriberState struct {
 	writeMux     sync.Mutex
 	statMux      sync.Mutex
 	stopped      atomic.Bool
+	lastStatAt   time.Time
+
+	prevReadBytesSum  uint64
+	prevWroteBytesSum uint64
+
+	base.StatSession
+}
+
+type publisherState struct {
+	key          StreamKey
+	statProvider PublisherStatProvider
+	statMux      sync.Mutex
 	lastStatAt   time.Time
 
 	prevReadBytesSum  uint64
@@ -254,6 +277,11 @@ func (group *Group) OnStop() {
 			group.consumers.Delete(key)
 			return true
 		})
+
+		group.publisherMux.Lock()
+		group.publisher = nil
+		group.publisherMux.Unlock()
+
 		group.lifecycleMux.Unlock()
 
 		nazalog.Debugf("OnStop, uniqueKey:%s, streamKey:%s", group.uniqueKey, group.key.String())
@@ -378,6 +406,65 @@ func (group *Group) RemoveSubscriber(subscriberID string) {
 
 func (group *Group) RemoveConsumer(consumerID string) {
 	group.RemoveSubscriber(consumerID)
+}
+
+func (group *Group) AddPublisher(info PublisherInfo, provider PublisherStatProvider) {
+	if info.PublisherID == "" {
+		nazalog.Warn("AddPublisher skipped, publisher id is empty")
+		return
+	}
+	if info.Protocol == "" {
+		info.Protocol = PublisherProtocolWHIP
+	}
+
+	group.lifecycleMux.RLock()
+	if group.closed.Load() {
+		group.lifecycleMux.RUnlock()
+		nazalog.Warnf("AddPublisher skipped, group is closed, streamKey:%s, publisherId:%s", group.key.String(), info.PublisherID)
+		return
+	}
+	defer group.lifecycleMux.RUnlock()
+
+	state := &publisherState{
+		key:          group.key,
+		statProvider: provider,
+		lastStatAt:   time.Now(),
+		StatSession: base.StatSession{
+			SessionId:  info.PublisherID,
+			Protocol:   info.Protocol,
+			BaseType:   base.SessionBaseTypePubStr,
+			RemoteAddr: info.RemoteAddr,
+			StartTime:  time.Now().Format(time.DateTime),
+		},
+	}
+
+	group.publisherMux.Lock()
+	group.publisher = state
+	group.publisherMux.Unlock()
+
+	nazalog.Infof("AddPublisher, streamKey:%s, publisherId:%s, protocol:%s", group.key.String(), info.PublisherID, info.Protocol)
+}
+
+func (group *Group) RemovePublisher(publisherID string) {
+	group.publisherMux.Lock()
+	defer group.publisherMux.Unlock()
+
+	if group.publisher == nil || group.publisher.SessionId != publisherID {
+		return
+	}
+
+	nazalog.Infof("RemovePublisher, streamKey:%s, publisherId:%s", group.key.String(), publisherID)
+	group.publisher = nil
+}
+
+func (group *Group) StatPublisher() base.StatPub {
+	group.publisherMux.RLock()
+	defer group.publisherMux.RUnlock()
+
+	if group.publisher == nil {
+		return base.StatPub{}
+	}
+	return base.StatPub{StatSession: group.publisher.refreshStat(0)}
 }
 
 func (group *Group) GetVideoSeqHeaderMsg() *base.RtmpMsg {
@@ -518,6 +605,61 @@ func (s *subscriberState) updateBitrateLocked(intervalSec float64) {
 
 	s.prevReadBytesSum = s.StatSession.ReadBytesSum
 	s.prevWroteBytesSum = s.StatSession.WroteBytesSum
+}
+
+func (p *publisherState) refreshStat(intervalSec float64) base.StatSession {
+	if p == nil {
+		return base.StatSession{}
+	}
+
+	p.statMux.Lock()
+	defer p.statMux.Unlock()
+
+	p.refreshStatSnapshotLocked()
+
+	if intervalSec <= 0 {
+		if p.lastStatAt.IsZero() {
+			p.lastStatAt = time.Now()
+			return p.StatSession
+		}
+		intervalSec = time.Since(p.lastStatAt).Seconds()
+		if intervalSec < 1 {
+			return p.StatSession
+		}
+	}
+
+	p.updateBitrateLocked(intervalSec)
+	p.lastStatAt = time.Now()
+	return p.StatSession
+}
+
+func (p *publisherState) refreshStatSnapshotLocked() {
+	if p.statProvider == nil {
+		return
+	}
+
+	stat := p.statProvider.GetPublisherStat()
+	if stat.RemoteAddr != "" {
+		p.StatSession.RemoteAddr = stat.RemoteAddr
+	}
+	p.StatSession.ReadBytesSum = stat.ReadBytesSum
+	p.StatSession.WroteBytesSum = stat.WroteBytesSum
+}
+
+func (p *publisherState) updateBitrateLocked(intervalSec float64) {
+	if intervalSec <= 0 {
+		return
+	}
+
+	readDiff := diffUint64(p.StatSession.ReadBytesSum, p.prevReadBytesSum)
+	writeDiff := diffUint64(p.StatSession.WroteBytesSum, p.prevWroteBytesSum)
+
+	p.StatSession.ReadBitrateKbits = bitrateFromBytes(readDiff, intervalSec)
+	p.StatSession.WriteBitrateKbits = bitrateFromBytes(writeDiff, intervalSec)
+	p.StatSession.BitrateKbits = p.StatSession.ReadBitrateKbits
+
+	p.prevReadBytesSum = p.StatSession.ReadBytesSum
+	p.prevWroteBytesSum = p.StatSession.WroteBytesSum
 }
 
 func bitrateFromBytes(bytes uint64, intervalSec float64) int {

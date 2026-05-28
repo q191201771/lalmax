@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 
+	maxlogic "github.com/q191201771/lalmax/logic"
+
 	"github.com/gin-gonic/gin"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
@@ -79,6 +81,13 @@ func (s *LalMaxServer) ctrlKickSessionHandler(c *gin.Context) {
 	}
 
 	Log.Infof("http api kick session. req info=%+v", info)
+
+	if maxlogic.KickCustomizePub(info.StreamName, info.SessionId) {
+		v.ErrorCode = base.ErrorCodeSucc
+		v.Desp = base.DespSucc
+		c.JSON(http.StatusOK, v)
+		return
+	}
 
 	resp := s.lalsvr.CtrlKickSession(info)
 	c.JSON(http.StatusOK, resp)

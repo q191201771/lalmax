@@ -2,7 +2,7 @@ package logic
 
 import "github.com/q191201771/lal/pkg/base"
 
-// StatAggregator merges lal native group state with lalmax extension subscribers.
+// StatAggregator merges lal native group state with lalmax extension subscribers and publishers.
 type StatAggregator struct {
 	groupManager IGroupManager
 }
@@ -10,6 +10,7 @@ type StatAggregator struct {
 type StatGroupView struct {
 	Group   base.StatGroup
 	ExtSubs []base.StatSub
+	ExtPub  base.StatPub
 }
 
 func NewStatAggregator(groupManager IGroupManager) *StatAggregator {
@@ -39,17 +40,38 @@ func (a *StatAggregator) ExtSubscribers(key StreamKey) []base.StatSub {
 	return out
 }
 
+func (a *StatAggregator) ExtPublisher(key StreamKey) base.StatPub {
+	if a == nil || a.groupManager == nil || !key.Valid() {
+		return base.StatPub{}
+	}
+
+	exist, extGroup := a.groupManager.GetGroup(key)
+	if !exist || extGroup == nil {
+		return base.StatPub{}
+	}
+
+	return extGroup.StatPublisher()
+}
+
 func (a *StatAggregator) BuildGroupView(group base.StatGroup) StatGroupView {
-	extSubs := a.ExtSubscribers(NewStreamKey(group.AppName, group.StreamName))
+	key := NewStreamKey(group.AppName, group.StreamName)
+
+	extSubs := a.ExtSubscribers(key)
 	if len(extSubs) != 0 {
 		group.StatSubs = append(group.StatSubs, extSubs...)
 	} else {
 		extSubs = make([]base.StatSub, 0)
 	}
 
+	extPub := a.ExtPublisher(key)
+	if extPub.SessionId != "" && group.StatPub.SessionId == "" {
+		group.StatPub = extPub
+	}
+
 	return StatGroupView{
 		Group:   group,
 		ExtSubs: extSubs,
+		ExtPub:  extPub,
 	}
 }
 

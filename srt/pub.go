@@ -3,7 +3,12 @@ package srt
 import (
 	"bufio"
 	"context"
+	"io"
+	"sync"
+	"sync/atomic"
+
 	srt "github.com/datarhei/gosrt"
+	maxlogic "github.com/q191201771/lalmax/logic"
 	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
@@ -20,6 +25,11 @@ type Publisher struct {
 	demuxer     *ts.TSDemuxer
 	conn        srt.Conn
 	subscribers []*Subscriber
+	group       *maxlogic.Group
+	publisherID string
+	remoteAddr  string
+	readBytes   atomic.Uint64
+	closeOnce   sync.Once
 }
 
 func NewPublisher(ctx context.Context, conn srt.Conn, streamName string, srv *SrtServer) *Publisher {
@@ -29,6 +39,9 @@ func NewPublisher(ctx context.Context, conn srt.Conn, streamName string, srv *Sr
 		streamName: streamName,
 		conn:       conn,
 		demuxer:    ts.NewTSDemuxer(),
+	}
+	if conn != nil && conn.RemoteAddr() != nil {
+		pub.remoteAddr = conn.RemoteAddr().String()
 	}
 
 	nazalog.Infof("create srt publisher, streamName:%s", streamName)
@@ -40,10 +53,26 @@ func (p *Publisher) SetSession(session logic.ICustomizePubSessionContext) {
 }
 
 func (p *Publisher) Run() {
-	defer func() {
-		p.conn.Close()
-		p.srv.Remove(p.streamName, p.ss)
-	}()
+	defer p.cleanup()
+
+	if p.ss == nil {
+		nazalog.Errorf("srt publisher missing lal session, streamName:%s", p.streamName)
+		return
+	}
+
+	p.publisherID = p.ss.UniqueKey()
+	if ok, group := maxlogic.GetGroupManagerInstance().GetGroupByStreamName(p.streamName); ok {
+		p.group = group
+	}
+	maxlogic.RegisterCustomizePub(p.streamName, p.publisherID, "", p.kick)
+	if p.group != nil {
+		p.group.AddPublisher(maxlogic.PublisherInfo{
+			PublisherID: p.publisherID,
+			Protocol:    maxlogic.PublisherProtocolSRT,
+			RemoteAddr:  p.remoteAddr,
+		}, p)
+	}
+
 	audioSampleRate := uint32(0)
 	var foundAudio bool
 	p.demuxer.OnFrame = func(cid ts.TS_STREAM_TYPE, frame []byte, pts uint64, dts uint64) {
@@ -101,9 +130,47 @@ func (p *Publisher) Run() {
 			p.ss.FeedAvPacket(pkt)
 		}
 	}
-	err := p.demuxer.Input(bufio.NewReader(p.conn))
+
+	reader := &countingReader{r: p.conn, n: &p.readBytes}
+	err := p.demuxer.Input(bufio.NewReader(reader))
 	if err != nil {
 		nazalog.Infof("stream [%s] disconnected", p.streamName)
 	}
-	return
+}
+
+func (p *Publisher) GetPublisherStat() maxlogic.PublisherStat {
+	return maxlogic.PublisherStat{
+		RemoteAddr:   p.remoteAddr,
+		ReadBytesSum: p.readBytes.Load(),
+	}
+}
+
+func (p *Publisher) kick() {
+	_ = p.conn.Close()
+}
+
+func (p *Publisher) cleanup() {
+	p.closeOnce.Do(func() {
+		if p.group != nil && p.publisherID != "" {
+			p.group.RemovePublisher(p.publisherID)
+		}
+		maxlogic.UnregisterCustomizePub(p.publisherID, "")
+		_ = p.conn.Close()
+		if p.srv != nil && p.ss != nil {
+			p.srv.Remove(p.streamName, p.ss)
+		}
+	})
+}
+
+type countingReader struct {
+	r io.Reader
+	n *atomic.Uint64
+}
+
+func (cr *countingReader) Read(b []byte) (int, error) {
+	n, err := cr.r.Read(b)
+	if n > 0 {
+		cr.n.Add(uint64(n))
+	}
+	return n, err
 }

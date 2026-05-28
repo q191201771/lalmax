@@ -7,6 +7,7 @@ import (
 
 type LalmaxGroupStat struct {
 	ExtSubs []base.StatSub `json:"ext_subs"`
+	ExtPub  base.StatPub   `json:"ext_pub"`
 }
 
 type LalmaxStatGroup struct {
@@ -50,6 +51,7 @@ func newLalmaxStatGroup(view maxlogic.StatGroupView) LalmaxStatGroup {
 		Fps:         group.Fps,
 		Lalmax: LalmaxGroupStat{
 			ExtSubs: view.ExtSubs,
+			ExtPub:  view.ExtPub,
 		},
 	}
 }
