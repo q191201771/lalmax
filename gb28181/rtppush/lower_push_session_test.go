@@ -1,6 +1,7 @@
 package rtppush
 
 import (
+	"bytes"
 	"io"
 	"net"
 	"testing"
@@ -10,7 +11,62 @@ import (
 	"github.com/q191201771/lal/pkg/avc"
 	lalbase "github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/rtprtcp"
+	"github.com/q191201771/lalmax/gb28181/mpegps"
 )
+
+func TestLowerPushSessionMultiPESFrameMarker(t *testing.T) {
+	session := NewLowerPushSession()
+	session.SetSsrc(0x11223344)
+	sid := session.psMuxer.AddStream(mpegps.PsStreamH264)
+	var packets []rtprtcp.RtpPacket
+	var psData []byte
+	session.psMuxer.OnPacket = func(pkg []byte, pts uint64) {
+		psData = append(psData, pkg...)
+		packets = append(packets, session.packRtp(pkg, uint32(pts))...)
+	}
+
+	// A large IDR needs four PES packets; the next small frame must still
+	// get its own marker and timestamp without waiting for another frame.
+	seq := uint16(1)
+	for i, size := range []int{200000, 32} {
+		packets = nil
+		psData = nil
+		frame := bytes.Repeat([]byte{0x55}, size)
+		copy(frame, []byte{0x00, 0x00, 0x00, 0x01, 0x65})
+		pts := uint64(1000 + i*40)
+		if err := session.psMuxer.Write(sid, frame, pts, pts); err != nil {
+			t.Fatal(err)
+		}
+		if len(packets) == 0 {
+			t.Fatal("no RTP packets")
+		}
+		var reassembled []byte
+		for j, pkt := range packets {
+			parsed, err := rtprtcp.ParseRtpPacket(pkt.Raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			wantMark := uint8(0)
+			if j == len(packets)-1 {
+				wantMark = 1
+			}
+			if parsed.Header.Mark != wantMark {
+				t.Fatalf("frame %d, packet %d/%d: marker = %d, want %d", i, j+1, len(packets), parsed.Header.Mark, wantMark)
+			}
+			if parsed.Header.Seq != seq || parsed.Header.Timestamp != uint32(pts*90) || parsed.Header.Ssrc != 0x11223344 {
+				t.Fatalf("unexpected RTP header: %+v", parsed.Header)
+			}
+			seq++
+			if len(parsed.Body()) > lowerPushRtpPacketMax {
+				t.Fatalf("RTP payload too large: %d", len(parsed.Body()))
+			}
+			reassembled = append(reassembled, parsed.Body()...)
+		}
+		if !bytes.Equal(reassembled, psData) {
+			t.Fatal("RTP payload does not preserve complete PS data")
+		}
+	}
+}
 
 func TestLowerPushSessionUDPWriteRtpPacket(t *testing.T) {
 	ln, err := net.ListenPacket("udp", "127.0.0.1:0")

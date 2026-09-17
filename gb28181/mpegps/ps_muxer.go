@@ -7,8 +7,9 @@ import (
 )
 
 type PsMuxer struct {
-	system     *SystemHeader
-	psm        *ProgramStreamMap
+	system *SystemHeader
+	psm    *ProgramStreamMap
+	// OnPacket receives the complete PS data for one frame, including all PES segments.
 	OnPacket   func(pkg []byte, pts uint64)
 	firstframe bool
 }
@@ -142,11 +143,10 @@ func (muxer *PsMuxer) Write(sid uint8, frame []byte, pts uint64, dts uint64) err
 		}
 		pespkg.Encode(bsw)
 		pespkg.PesPayload = pespkg.PesPayload[:0]
-		if muxer.OnPacket != nil {
-			muxer.OnPacket(bsw.Bits(), pts)
-		}
-		bsw.Reset()
 		first = false
+	}
+	if muxer.OnPacket != nil {
+		muxer.OnPacket(bsw.Bits(), pts)
 	}
 	return nil
 }

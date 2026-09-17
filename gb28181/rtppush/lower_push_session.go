@@ -622,7 +622,7 @@ func (s *LowerPushSession) nextSeq() uint16 {
 	return s.seq
 }
 
-// packRtp 将 PS 数据按 RTP 最大负载长度切片，并生成 RTP 包。
+// packRtp 将一帧完整的 PS 数据按 RTP 最大负载长度切片，仅在最后一包设置 Marker。
 func (s *LowerPushSession) packRtp(buf []byte, timestamp uint32) []rtprtcp.RtpPacket {
 	var out []rtprtcp.RtpPacket
 	for offset := 0; offset < len(buf); {
