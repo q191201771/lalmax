@@ -130,6 +130,18 @@ http(s)://127.0.0.1:1290/live/hls/test110/index.m3u8
 (4) 支持TCP/UDP
 
 
+# 基于 lalmax 的应用
+
+## lalmax-nvr
+
+[lalmax-nvr](https://github.com/lalmax-pro/lalmax-nvr) 是基于 lal / lalmax 媒体引擎构建的开源轻量级网络视频录像机（NVR），提供 Web 管理界面，适用于摄像头接入、实时预览和录像回放。
+
+- 接入：RTSP / ONVIF 摄像头、GB28181 设备，以及 RTMP / SRT / WHIP 推流。
+- 录像：连续、定时和事件录像计划，录像保留策略与时间轴回放。
+- 部署：单二进制内嵌 Web UI，或使用 Docker。
+
+[中文说明](https://github.com/lalmax-pro/lalmax-nvr/blob/main/README.zh.md) · [产品官网](https://lalmax-pro.github.io/lalmax-nvr/)
+
 # QQ交流群
 11818248
 
