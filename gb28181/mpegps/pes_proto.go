@@ -220,12 +220,32 @@ func (pkg *PesPacket) Decode(bs *BitStream) error {
 	}
 
 	loc := bs.DistanceFromMarkDot()
-	bs.SkipBits(int(pkg.PesHeaderDataLength)*8 - loc) // skip remaining header
+	headerBits := int(pkg.PesHeaderDataLength) * 8
+	if loc > headerBits {
+		return errParser
+	}
+	bs.SkipBits(headerBits - loc) // skip remaining header
+
+	// PES packet_length 为 0 表示载荷延续到下一个起始码。
+	// 未找到下一个 PS 层起始码时继续缓存，避免把分片误判为完整 PES。
+	if pkg.PesPacketLength == 0 {
+		dataLen := nextPsPacketOffset(bs.RemainData())
+		if dataLen < 0 {
+			bs.UnRead((9 + int(pkg.PesHeaderDataLength)) * 8)
+			return errNeedMore
+		}
+		pkg.PesPayload = bs.RemainData()[:dataLen]
+		bs.SkipBits(dataLen * 8)
+		return nil
+	}
 
 	// the -3 bytes are the combined lengths
 	// of all fields between PesHeaderDataLength and PesHeaderDataLength (2 bytes)
 	// and the PesHeaderDataLength itself (1 byte)
-	dataLen := int(pkg.PesPacketLength - 3 - uint16(pkg.PesHeaderDataLength))
+	dataLen := int(pkg.PesPacketLength) - 3 - int(pkg.PesHeaderDataLength)
+	if dataLen < 0 {
+		return errParser
+	}
 
 	if bs.RemainBytes() < dataLen {
 		pkg.PesPayload = bs.RemainData()
@@ -233,7 +253,7 @@ func (pkg *PesPacket) Decode(bs *BitStream) error {
 		return errNeedMore
 	}
 
-	if pkg.PesPacketLength == 0 || bs.RemainBytes() <= dataLen {
+	if bs.RemainBytes() <= dataLen {
 		pkg.PesPayload = bs.RemainData()
 		bs.SkipBits(bs.RemainBits())
 	} else {
@@ -242,6 +262,15 @@ func (pkg *PesPacket) Decode(bs *BitStream) error {
 	}
 
 	return nil
+}
+
+func nextPsPacketOffset(data []byte) int {
+	for i := 0; i+4 <= len(data); i++ {
+		if data[i] == 0x00 && data[i+1] == 0x00 && data[i+2] == 0x01 && data[i+3] >= byte(PesStreamEnd) {
+			return i
+		}
+	}
+	return -1
 }
 
 func (pkg *PesPacket) DecodeMpeg1(bs *BitStream) error {
@@ -290,11 +319,20 @@ func (pkg *PesPacket) DecodeMpeg1(bs *BitStream) error {
 		return errParser
 	}
 	loc := bs.DistanceFromMarkDot() / 8
+	if pkg.PesPacketLength == 0 {
+		dataLen := nextPsPacketOffset(bs.RemainData())
+		if dataLen < 0 {
+			bs.UnRead((6 + loc) * 8)
+			return errNeedMore
+		}
+		pkg.PesPayload = bs.RemainData()[:dataLen]
+		bs.SkipBits(dataLen * 8)
+		return nil
+	}
 	if pkg.PesPacketLength < uint16(loc) {
 		return errParser
 	}
-	if pkg.PesPacketLength == 0 ||
-		bs.RemainBits() <= int(pkg.PesPacketLength-uint16(loc))*8 {
+	if bs.RemainBits() <= int(pkg.PesPacketLength-uint16(loc))*8 {
 		pkg.PesPayload = bs.RemainData()
 		bs.SkipBits(bs.RemainBits())
 	} else {

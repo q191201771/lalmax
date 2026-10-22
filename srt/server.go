@@ -134,18 +134,24 @@ func (s *SrtServer) Remove(host string, ss logic.ICustomizePubSessionContext) {
 
 type StreamInfo struct {
 	StreamName string
-	Mode    srt.ConnType
+	Mode       srt.ConnType
 }
 
 func getStreamInfo(streamid string) StreamInfo {
 	info := StreamInfo{
 		Mode: srt.REJECT,
 	}
+	if !strings.HasPrefix(streamid, "#!::") {
+		return info
+	}
 
-	s := strings.TrimLeft(streamid, "#!::")
+	s := strings.TrimPrefix(streamid, "#!::")
 	values := strings.Split(s, ",")
 	for _, v := range values {
-		ss := strings.Split(v, "=")
+		ss := strings.SplitN(v, "=", 2)
+		if len(ss) < 2 {
+			continue
+		}
 		name := ss[0]
 		switch name {
 		case "h":
@@ -158,6 +164,9 @@ func getStreamInfo(streamid string) StreamInfo {
 				info.Mode = srt.SUBSCRIBE
 			}
 		}
+	}
+	if strings.TrimSpace(info.StreamName) == "" {
+		info.Mode = srt.REJECT
 	}
 
 	return info

@@ -21,6 +21,7 @@ type ffmpegRecorder struct {
 type recordSession struct {
 	cmd    *exec.Cmd
 	cancel context.CancelFunc
+	done   chan struct{}
 	app    string
 	stream string
 	file   string
@@ -89,6 +90,7 @@ func (r *ffmpegRecorder) startRecord(rtmpAddr, app, stream string, typ int, maxS
 	sess := &recordSession{
 		cmd:    cmd,
 		cancel: cancel,
+		done:   make(chan struct{}),
 		app:    app,
 		stream: stream,
 		file:   outPath,
@@ -98,8 +100,11 @@ func (r *ffmpegRecorder) startRecord(rtmpAddr, app, stream string, typ int, maxS
 
 	go func() {
 		_ = cmd.Wait()
+		close(sess.done)
 		r.mu.Lock()
-		delete(r.sessions, key)
+		if r.sessions[key] == sess {
+			delete(r.sessions, key)
+		}
 		r.mu.Unlock()
 		Log.Infof("ffmpeg record finished. key=%s, file=%s", key, outPath)
 	}()
@@ -122,7 +127,7 @@ func (r *ffmpegRecorder) stopRecord(app, stream string, typ int) (string, error)
 	r.mu.Unlock()
 
 	sess.cancel()
-	_ = sess.cmd.Wait()
+	<-sess.done
 	Log.Infof("ffmpeg record stopped. key=%s, file=%s, duration=%s", key, sess.file, time.Since(sess.start))
 	return sess.file, nil
 }

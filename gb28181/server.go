@@ -370,7 +370,12 @@ func (s *GB28181Server) removeBanDevice() {
 func (s *GB28181Server) statusCheck() {
 	Devices.Range(func(key, value any) bool {
 		d := value.(*Device)
-		if int(time.Since(d.LastKeepaliveAt).Seconds()) > s.keepaliveInterval*3 {
+		// 还没收到心跳时从注册时间起算，零值时间会被当成早已超时。
+		keepaliveAt := d.LastKeepaliveAt
+		if keepaliveAt.IsZero() {
+			keepaliveAt = d.RegisterTime
+		}
+		if !keepaliveAt.IsZero() && int(time.Since(keepaliveAt).Seconds()) > s.keepaliveInterval*3 {
 			Devices.Delete(key)
 			nazalog.Warn("Device Keepalive timeout, id:", d.ID, " LastKeepaliveAt:", d.LastKeepaliveAt, " updateTime:", d.UpdateTime)
 		} else if time.Since(d.UpdateTime) > s.HeartbeatInterval*3 {
@@ -391,7 +396,6 @@ func (s *GB28181Server) getDeviceInfos() (deviceInfos *DeviceInfos) {
 	}
 	Devices.Range(func(key, value any) bool {
 		d := value.(*Device)
-		d.Status = DeviceOfflineStatus
 		deviceItem := &DeviceItem{
 			DeviceId: d.ID,
 			Channels: make([]*ChannelItem, 0),

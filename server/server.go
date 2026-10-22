@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/q191201771/lalmax/srt"
@@ -29,6 +30,7 @@ import (
 
 type LalMaxServer struct {
 	lalsvr      logic.ILalServer
+	confMux     sync.RWMutex
 	conf        *config.Config
 	stats       *maxlogic.StatAggregator
 	notifyHub   *HttpNotify
@@ -181,7 +183,9 @@ func (s *LalMaxServer) runPeriodicUpdate(ctx context.Context) {
 		return
 	}
 
+	s.confMux.RLock()
 	intervalSec := s.conf.HttpNotifyConfig.UpdateIntervalSec
+	s.confMux.RUnlock()
 	if intervalSec <= 0 {
 		return
 	}
@@ -207,7 +211,9 @@ func (s *LalMaxServer) runPeriodicKeepalive(ctx context.Context) {
 		return
 	}
 
+	s.confMux.RLock()
 	intervalSec := s.conf.HttpNotifyConfig.KeepaliveIntervalSec
+	s.confMux.RUnlock()
 	if intervalSec <= 0 {
 		return
 	}

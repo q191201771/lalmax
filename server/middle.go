@@ -41,6 +41,7 @@ func Authentication(secrets, ips []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !authentication(c.Query("token"), c.ClientIP(), secrets, ips) {
 			c.JSON(200, out)
+			c.Abort()
 			return
 		}
 		c.Next()

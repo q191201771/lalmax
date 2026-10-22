@@ -97,7 +97,8 @@ const (
 type SubCountFn func(streamName string) int
 
 type HttpNotify struct {
-	cfg config.HttpNotifyConfig
+	cfgMux sync.RWMutex
+	cfg    config.HttpNotifyConfig
 
 	serverId string
 	stats    *maxlogic.StatAggregator
@@ -120,6 +121,8 @@ type HttpNotify struct {
 
 // SetSubCountFn 注入 sub 数量查询函数，用于 on_stream_none_reader 判断
 func (h *HttpNotify) SetSubCountFn(fn SubCountFn) {
+	h.cfgMux.Lock()
+	defer h.cfgMux.Unlock()
 	h.subCountFn = fn
 }
 
@@ -127,11 +130,12 @@ func (h *HttpNotify) SetSubCountFn(fn SubCountFn) {
 // 为什么：gb28181 通过 setServerConfig 动态设置 hook URL，需要立即生效
 // 为什么清零原有字段：ZLM 回调与 lalmax 原有回调互斥，避免双重触发
 func (h *HttpNotify) UpdateZlmHookConfig(zlmCfg config.ZlmCompatHookConfig) {
+	h.cfgMux.Lock()
 	h.cfg.ZlmCompatHookConfig = zlmCfg
 	h.cfg.Enable = true
 
 	if h.cfg.HookTimeoutSec > 0 {
-		h.client.Timeout = time.Duration(h.cfg.HookTimeoutSec) * time.Second
+		h.client = &http.Client{Timeout: time.Duration(h.cfg.HookTimeoutSec) * time.Second}
 	}
 
 	h.cfg.OnServerStart = ""
@@ -147,9 +151,17 @@ func (h *HttpNotify) UpdateZlmHookConfig(zlmCfg config.ZlmCompatHookConfig) {
 	h.cfg.OnRelayPullStop = ""
 	h.cfg.OnRtmpConnect = ""
 	h.cfg.OnHlsMakeTs = ""
+	timeoutSec := h.cfg.HookTimeoutSec
+	h.cfgMux.Unlock()
 
 	Log.Infof("zlm compat hook config updated. timeout=%ds, on_stream_changed=%s, on_server_keepalive=%s, on_publish=%s, on_play=%s",
-		h.cfg.HookTimeoutSec, zlmCfg.ZlmOnStreamChanged, zlmCfg.ZlmOnServerKeepalive, zlmCfg.ZlmOnPublish, zlmCfg.ZlmOnPlay)
+		timeoutSec, zlmCfg.ZlmOnStreamChanged, zlmCfg.ZlmOnServerKeepalive, zlmCfg.ZlmOnPublish, zlmCfg.ZlmOnPlay)
+}
+
+func (h *HttpNotify) configSnapshot() config.HttpNotifyConfig {
+	h.cfgMux.RLock()
+	defer h.cfgMux.RUnlock()
+	return h.cfg
 }
 
 func NewHttpNotify(cfg config.HttpNotifyConfig, serverId string) *HttpNotify {
@@ -208,7 +220,7 @@ func (h *HttpNotify) NotifyPubStart(info base.PubStartInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventPubStart, info)
 
-	if !h.cfg.HasZlmHooks() {
+	if !h.configSnapshot().HasZlmHooks() {
 		return
 	}
 	// --- ZLM 兼容：派生 on_publish + on_stream_changed ---
@@ -235,7 +247,7 @@ func (h *HttpNotify) NotifyPubStop(info base.PubStopInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventPubStop, info)
 
-	if !h.cfg.HasZlmHooks() {
+	if !h.configSnapshot().HasZlmHooks() {
 		return
 	}
 	// --- ZLM 兼容：派生 on_stream_changed(regist=false) ---
@@ -255,7 +267,7 @@ func (h *HttpNotify) NotifySubStart(info base.SubStartInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventSubStart, info)
 
-	if !h.cfg.HasZlmHooks() {
+	if !h.configSnapshot().HasZlmHooks() {
 		return
 	}
 	// --- ZLM 兼容：派生 on_play ---
@@ -272,11 +284,15 @@ func (h *HttpNotify) NotifySubStop(info base.SubStopInfo) {
 	info.ServerId = h.serverId
 	h.publish(HookEventSubStop, info)
 
-	if h.cfg.ZlmOnStreamNoneReader == "" || h.subCountFn == nil {
+	h.cfgMux.RLock()
+	zlmOnStreamNoneReader := h.cfg.ZlmOnStreamNoneReader
+	subCountFn := h.subCountFn
+	h.cfgMux.RUnlock()
+	if zlmOnStreamNoneReader == "" || subCountFn == nil {
 		return
 	}
 	// 检查该流是否已无观看者，触发 on_stream_none_reader
-	if h.subCountFn(info.StreamName) <= 0 {
+	if subCountFn(info.StreamName) <= 0 {
 		h.NotifyStreamNoneReader(ZlmOnStreamNoneReaderPayload{
 			App:    info.AppName,
 			Schema: info.Protocol,
@@ -416,7 +432,7 @@ func (h *HttpNotify) OnHlsMakeTs(info base.HlsMakeTsInfo) {
 }
 
 func (h *HttpNotify) asyncPostEvent(url string, event HookEvent) {
-	if !h.cfg.Enable || url == "" {
+	if !h.configSnapshot().Enable || url == "" {
 		return
 	}
 
@@ -506,7 +522,9 @@ func (h *HttpNotify) postRaw(url string, payload []byte) {
 	}
 
 	body := bytes.NewBuffer(payload)
+	h.cfgMux.RLock()
 	client := h.client
+	h.cfgMux.RUnlock()
 	if client == nil {
 		client = http.DefaultClient
 	}

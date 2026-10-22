@@ -8,10 +8,10 @@ import (
 	"sync/atomic"
 
 	srt "github.com/datarhei/gosrt"
-	maxlogic "github.com/q191201771/lalmax/logic"
 	"github.com/q191201771/lal/pkg/aac"
 	"github.com/q191201771/lal/pkg/base"
 	"github.com/q191201771/lal/pkg/logic"
+	maxlogic "github.com/q191201771/lalmax/logic"
 	"github.com/q191201771/naza/pkg/nazalog"
 	codec "github.com/yapingcat/gomedia/go-codec"
 	ts "github.com/yapingcat/gomedia/go-mpeg2"
@@ -78,25 +78,33 @@ func (p *Publisher) Run() {
 	p.demuxer.OnFrame = func(cid ts.TS_STREAM_TYPE, frame []byte, pts uint64, dts uint64) {
 		var pkt base.AvPacket
 		if cid == ts.TS_STREAM_AAC {
-			if !foundAudio {
-				if asc, err := codec.ConvertADTSToASC(frame); err != nil {
-					return
-				} else {
-					p.ss.FeedAudioSpecificConfig(asc.Encode())
-					audioSampleRate = uint32(codec.AACSampleIdxToSample(int(asc.Sample_freq_index)))
-				}
-
-				foundAudio = true
-			}
-
 			var preAudioDts uint64
-			ctx := aac.AdtsHeaderContext{}
-			for len(frame) > aac.AdtsHeaderLength {
-				ctx.Unpack(frame[:])
+			for len(frame) >= aac.AdtsHeaderLength {
+				headerLen, frameLen, ok := adtsFrameBounds(frame)
+				if !ok {
+					return
+				}
+				if !foundAudio {
+					asc, convErr := codec.ConvertADTSToASC(frame[:frameLen])
+					if convErr != nil {
+						return
+					}
+					rate, rateOK := aacSampleRateFromIndex(int(asc.Sample_freq_index))
+					if !rateOK {
+						return
+					}
+					p.ss.FeedAudioSpecificConfig(asc.Encode())
+					audioSampleRate = rate
+					foundAudio = true
+				}
 				if preAudioDts == 0 {
 					preAudioDts = dts
 				} else {
-					preAudioDts += uint64(1024 * 1000 / audioSampleRate)
+					duration, ok := aacFrameDurationMs(audioSampleRate)
+					if !ok {
+						return
+					}
+					preAudioDts += duration
 				}
 
 				aacPacket := base.AvPacket{
@@ -104,17 +112,9 @@ func (p *Publisher) Run() {
 					PayloadType: base.AvPacketPtAac,
 					Pts:         int64(preAudioDts),
 				}
-				if len(frame) >= int(ctx.AdtsLength) {
-					Payload := frame[aac.AdtsHeaderLength:ctx.AdtsLength]
-					if len(frame) > int(ctx.AdtsLength) {
-						frame = frame[ctx.AdtsLength:]
-					} else {
-						frame = frame[0:0]
-					}
-					aacPacket.Payload = Payload
-					p.ss.FeedAvPacket(aacPacket)
-				}
-
+				aacPacket.Payload = frame[headerLen:frameLen]
+				p.ss.FeedAvPacket(aacPacket)
+				frame = frame[frameLen:]
 			}
 		} else if cid == ts.TS_STREAM_H264 {
 			pkt.Payload = frame
@@ -160,6 +160,39 @@ func (p *Publisher) cleanup() {
 			p.srv.Remove(p.streamName, p.ss)
 		}
 	})
+}
+
+func aacSampleRateFromIndex(idx int) (uint32, bool) {
+	if idx < 0 || idx >= len(codec.AAC_Sampling_Idx) {
+		return 0, false
+	}
+	rate := codec.AACSampleIdxToSample(idx)
+	if rate <= 0 {
+		return 0, false
+	}
+	return uint32(rate), true
+}
+
+func aacFrameDurationMs(sampleRate uint32) (uint64, bool) {
+	if sampleRate == 0 {
+		return 0, false
+	}
+	return uint64(1024 * 1000 / sampleRate), true
+}
+
+func adtsFrameBounds(frame []byte) (headerLen int, frameLen int, ok bool) {
+	if len(frame) < aac.AdtsHeaderLength || frame[0] != 0xFF || frame[1]&0xF6 != 0xF0 {
+		return 0, 0, false
+	}
+	headerLen = aac.AdtsHeaderLength
+	if frame[1]&0x01 == 0 {
+		headerLen += 2
+	}
+	frameLen = int(frame[3]&0x03)<<11 | int(frame[4])<<3 | int(frame[5]>>5)
+	if frameLen < headerLen || frameLen > len(frame) {
+		return 0, 0, false
+	}
+	return headerLen, frameLen, true
 }
 
 type countingReader struct {

@@ -46,10 +46,12 @@ func NewUnPacker(mimeType string, clockRate uint32, pktChan chan<- base.AvPacket
 		un.dec = NewH264RtpDecoder(un.format)
 	case webrtc.MimeTypePCMA:
 		un.payloadType = base.AvPacketPtG711A
-		un.format = &format.G711{}
+		un.format = newG711Format(false, 8, clockRate)
+		un.dec = NewG711RtpDecoder(un.format)
 	case webrtc.MimeTypePCMU:
 		un.payloadType = base.AvPacketPtG711U
-		un.format = &format.G711{}
+		un.format = newG711Format(true, 0, clockRate)
+		un.dec = NewG711RtpDecoder(un.format)
 	case webrtc.MimeTypeOpus:
 		un.payloadType = base.AvPacketPtOpus
 		un.format = &format.Opus{}
@@ -67,7 +69,24 @@ func NewUnPacker(mimeType string, clockRate uint32, pktChan chan<- base.AvPacket
 	return un
 }
 
+func newG711Format(muLaw bool, payloadType uint8, clockRate uint32) *format.G711 {
+	sampleRate := 8000
+	if clockRate > 0 {
+		sampleRate = int(clockRate)
+	}
+	return &format.G711{
+		PayloadTyp:   payloadType,
+		MULaw:        muLaw,
+		SampleRate:   sampleRate,
+		ChannelCount: 1,
+	}
+}
+
 func (un *UnPacker) UnPack(pkt *rtp.Packet) (err error) {
+	if un.dec == nil {
+		return fmt.Errorf("rtp decoder not initialized")
+	}
+
 	packets, lost := un.reorderer.Process(pkt)
 	if lost != 0 {
 		nazalog.Error("rtp lost")

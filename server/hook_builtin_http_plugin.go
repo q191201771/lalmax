@@ -15,97 +15,98 @@ func (p *hookBuiltinHTTPPlugin) OnHookEvent(event HookEvent) error {
 	if p == nil || p.hub == nil {
 		return nil
 	}
-	if !p.hub.cfg.Enable {
+	cfg := p.hub.configSnapshot()
+	if !cfg.Enable {
 		return nil
 	}
 
 	switch event.Event {
 	case HookEventServerStart:
-		if p.hub.cfg.OnServerStart != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnServerStart, event)
+		if cfg.OnServerStart != "" {
+			p.hub.asyncPostEvent(cfg.OnServerStart, event)
 		}
-		if p.hub.cfg.ZlmOnServerStarted != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnServerStarted, event)
+		if cfg.ZlmOnServerStarted != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnServerStarted, event)
 		}
 	case HookEventUpdate:
-		if p.hub.cfg.OnUpdate != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnUpdate, event)
+		if cfg.OnUpdate != "" {
+			p.hub.asyncPostEvent(cfg.OnUpdate, event)
 		}
 	case HookEventGroupStart:
-		if p.hub.cfg.OnGroupStart != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnGroupStart, event)
+		if cfg.OnGroupStart != "" {
+			p.hub.asyncPostEvent(cfg.OnGroupStart, event)
 		}
 	case HookEventGroupStop:
-		if p.hub.cfg.OnGroupStop != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnGroupStop, event)
+		if cfg.OnGroupStop != "" {
+			p.hub.asyncPostEvent(cfg.OnGroupStop, event)
 		}
 	case HookEventStreamActive:
-		if p.hub.cfg.OnStreamActive != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnStreamActive, event)
+		if cfg.OnStreamActive != "" {
+			p.hub.asyncPostEvent(cfg.OnStreamActive, event)
 		}
 	case HookEventPubStart:
-		if p.hub.cfg.OnPubStart != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnPubStart, event)
+		if cfg.OnPubStart != "" {
+			p.hub.asyncPostEvent(cfg.OnPubStart, event)
 		}
 	case HookEventPubStop:
-		if p.hub.cfg.OnPubStop != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnPubStop, event)
+		if cfg.OnPubStop != "" {
+			p.hub.asyncPostEvent(cfg.OnPubStop, event)
 		}
 	case HookEventSubStart:
-		if p.hub.cfg.OnSubStart != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnSubStart, event)
+		if cfg.OnSubStart != "" {
+			p.hub.asyncPostEvent(cfg.OnSubStart, event)
 		}
 	case HookEventSubStop:
-		if p.hub.cfg.OnSubStop != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnSubStop, event)
+		if cfg.OnSubStop != "" {
+			p.hub.asyncPostEvent(cfg.OnSubStop, event)
 		}
 	case HookEventRelayPullStart:
-		if p.hub.cfg.OnRelayPullStart != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnRelayPullStart, event)
+		if cfg.OnRelayPullStart != "" {
+			p.hub.asyncPostEvent(cfg.OnRelayPullStart, event)
 		}
 	case HookEventRelayPullStop:
-		if p.hub.cfg.OnRelayPullStop != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnRelayPullStop, event)
+		if cfg.OnRelayPullStop != "" {
+			p.hub.asyncPostEvent(cfg.OnRelayPullStop, event)
 		}
 	case HookEventRtmpConnect:
-		if p.hub.cfg.OnRtmpConnect != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnRtmpConnect, event)
+		if cfg.OnRtmpConnect != "" {
+			p.hub.asyncPostEvent(cfg.OnRtmpConnect, event)
 		}
 	case HookEventHlsMakeTs:
-		if p.hub.cfg.OnHlsMakeTs != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.OnHlsMakeTs, event)
+		if cfg.OnHlsMakeTs != "" {
+			p.hub.asyncPostEvent(cfg.OnHlsMakeTs, event)
 		}
 	case HookEventStreamChanged:
-		if p.hub.cfg.ZlmOnStreamChanged != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamChanged, event)
+		if cfg.ZlmOnStreamChanged != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnStreamChanged, event)
 		}
 	case HookEventServerKeepalive:
-		if p.hub.cfg.ZlmOnServerKeepalive != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnServerKeepalive, event)
+		if cfg.ZlmOnServerKeepalive != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnServerKeepalive, event)
 		}
 	case HookEventStreamNoneReader:
-		if p.hub.cfg.ZlmOnStreamNoneReader != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamNoneReader, event)
+		if cfg.ZlmOnStreamNoneReader != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnStreamNoneReader, event)
 		}
 	case HookEventRtpServerTimeout:
-		if p.hub.cfg.ZlmOnRtpServerTimeout != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnRtpServerTimeout, event)
+		if cfg.ZlmOnRtpServerTimeout != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnRtpServerTimeout, event)
 		}
 	case HookEventRecordMp4:
-		if p.hub.cfg.ZlmOnRecordMp4 != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnRecordMp4, event)
+		if cfg.ZlmOnRecordMp4 != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnRecordMp4, event)
 		}
 	case HookEventPublish:
-		if p.hub.cfg.ZlmOnPublish != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnPublish, event)
+		if cfg.ZlmOnPublish != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnPublish, event)
 		}
 	case HookEventPlay:
-		if p.hub.cfg.ZlmOnPlay != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnPlay, event)
+		if cfg.ZlmOnPlay != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnPlay, event)
 		}
 	case HookEventStreamNotFound:
-		if p.hub.cfg.ZlmOnStreamNotFound != "" {
-			p.hub.asyncPostEvent(p.hub.cfg.ZlmOnStreamNotFound, event)
+		if cfg.ZlmOnStreamNotFound != "" {
+			p.hub.asyncPostEvent(cfg.ZlmOnStreamNotFound, event)
 		}
 	}
 

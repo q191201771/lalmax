@@ -128,7 +128,9 @@ func (s *LalMaxServer) zlmCloseStreamsHandler(c *gin.Context) {
 // ---------- getServerConfig ----------
 
 func (s *LalMaxServer) zlmGetServerConfigHandler(c *gin.Context) {
+	s.confMux.RLock()
 	cfg := buildZlmServerConfig(s.conf)
+	s.confMux.RUnlock()
 	c.JSON(http.StatusOK, ZlmGetServerConfigResp{Code: 0, Data: []map[string]any{cfg}})
 }
 
@@ -142,6 +144,8 @@ func (s *LalMaxServer) zlmSetServerConfigHandler(c *gin.Context) {
 		})
 		return
 	}
+	s.confMux.Lock()
+	defer s.confMux.Unlock()
 
 	changed := 0
 	zlmCfg := s.conf.HttpNotifyConfig.ZlmCompatHookConfig

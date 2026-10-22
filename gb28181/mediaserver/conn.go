@@ -203,7 +203,6 @@ func (c *Conn) Serve() (err error) {
 			c.demuxer.Input(pkt.Payload)
 		}
 	}
-	return
 }
 
 func (c *Conn) Demuxer(data []byte) error {

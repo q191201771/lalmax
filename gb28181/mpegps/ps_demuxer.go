@@ -3,6 +3,8 @@ package mpegps
 //单元来源于https://github.com/yapingcat/gomedia
 import (
 	"errors"
+	"fmt"
+
 	"github.com/q191201771/lal/pkg/avc"
 	"github.com/q191201771/lal/pkg/hevc"
 	"github.com/q191201771/naza/pkg/nazalog"
@@ -58,7 +60,14 @@ func NewPsDemuxer() *PsDemuxer {
 	return psDemuxer
 }
 
-func (psDemuxer *PsDemuxer) Input(data []byte) error {
+func (psDemuxer *PsDemuxer) Input(data []byte) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			psDemuxer.cache = nil
+			err = fmt.Errorf("ps demux panic: %v", recovered)
+		}
+	}()
+
 	var bs *BitStream
 	if len(psDemuxer.cache) > 0 {
 		psDemuxer.cache = append(psDemuxer.cache, data...)
@@ -75,15 +84,11 @@ func (psDemuxer *PsDemuxer) Input(data []byte) error {
 
 	var ret error = nil
 	for !bs.EOS() {
-		if mpegerr, ok := ret.(Error); ok {
-			if mpegerr.NeedMore() {
-				saveReseved()
-			}
+		if ret != nil {
 			break
 		}
 		if bs.RemainBits() < 32 {
 			ret = errNeedMore
-			saveReseved()
 			break
 		}
 		prefix_code := bs.NextBits(32)
@@ -200,7 +205,13 @@ func (psDemuxer *PsDemuxer) Input(data []byte) error {
 		}
 	}
 
-	if ret == nil && len(psDemuxer.cache) > 0 {
+	if ret != nil {
+		if mpegerr, ok := ret.(Error); ok && mpegerr.NeedMore() {
+			saveReseved()
+		} else {
+			psDemuxer.cache = nil
+		}
+	} else if len(psDemuxer.cache) > 0 {
 		psDemuxer.cache = nil
 	}
 

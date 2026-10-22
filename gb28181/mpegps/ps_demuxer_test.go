@@ -65,7 +65,7 @@ func TestPSDemuxer_Input(t *testing.T) {
 		{name: "test6", fields: fields{
 			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
-		}, args: args{data: ps6}, wantErr: false},
+		}, args: args{data: ps6}, wantErr: true},
 		{name: "test-mpeg1", fields: fields{
 			streamMap: make(map[uint8]*psStream),
 			pkg:       new(PsPacket),
@@ -87,15 +87,18 @@ func TestPSDemuxer_Input(t *testing.T) {
 	}
 }
 func TestPSDemuxer(t *testing.T) {
+	dumpPath := os.Getenv("LALMAX_PS_DUMP")
+	if dumpPath == "" {
+		t.Skip("set LALMAX_PS_DUMP to run the PS dump integration test")
+	}
 	var psUnpacker *PsDemuxer
 	os.Remove("h.ps")
 	os.Remove("h.h264")
 	os.Remove("ps_demux_result")
 	dumpFile := base.NewDumpFile()
-	err := dumpFile.OpenToRead("C:\\Users\\Administrator\\Desktop\\dump_37060000001320000001001.raw")
+	err := dumpFile.OpenToRead(dumpPath)
 	if err != nil {
-		fmt.Println(err)
-		return
+		t.Fatal(err)
 	}
 	psUnpacker = NewPsDemuxer()
 	psUnpacker.OnFrame = func(frame []byte, cid PsStreamType, pts uint64, dts uint64) {
