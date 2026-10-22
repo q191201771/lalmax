@@ -7,6 +7,12 @@ lalmax是在lal的基础上集成第三方库，可以提供SRT、RTC、mp4、gb
 # 运行
 ./run.sh或者./lalmax -c conf/lalmax.conf.json
 
+# Console 监控页面
+
+启动后访问 `http://127.0.0.1:1290/console`，可以查看活动流、输入/输出码率、编码信息、会话、播放地址以及 Go 运行状态。单流详情页内置 WebRTC、HTTP-fMP4 和 HTTP-FLV 播放器，其中 FLV 使用本地内嵌的 `mpegts.js`，无需访问公网 CDN。mpegts.js 不支持 PCMA/PCMU 音频，遇到这类流时 Console 会忽略音频并继续预览视频。
+
+Console 默认每 2 秒刷新，并复用 `lalmax.http_config.ctrl_auth_whitelist` 鉴权。如果配置了密钥，可通过 `http://127.0.0.1:1290/console?token=YOUR_TOKEN` 访问。
+
 # 配置说明
 lalmax.conf.json 配置主要由 2 部分组成
 

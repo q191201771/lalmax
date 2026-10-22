@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>lalmax Console</title>
+  <link rel="stylesheet" href="/console-assets/console.css">
+  <script src="/console-assets/mpegts.js" defer></script>
+  <script src="/console-assets/console.js" defer></script>
+</head>
+<body>
+  <div class="console-shell">
+    <aside class="console-nav">
+      <a class="console-brand" href="/console/streams" data-console-link>
+        <span class="brand-mark">L</span>
+        <span><strong>lalmax</strong><em>Operations Console</em></span>
+      </a>
+      <nav class="nav-stack" aria-label="Console navigation">
+        <a href="/console/streams" data-console-link data-nav="streams">流监控</a>
+        <a href="/console/runtime" data-console-link data-nav="runtime">运行状态</a>
+        <a href="/api/stat/all_group" data-api-link target="_blank" rel="noopener">统计 API</a>
+      </nav>
+      <div class="nav-foot">
+        <span id="connection-dot" class="connection-dot"></span>
+        <span id="connection-text">正在连接</span>
+      </div>
+    </aside>
+
+    <div class="console-main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">流监控</h1>
+          <p id="page-subtitle">实时查看活动流、码率、会话和播放地址。</p>
+        </div>
+        <div class="top-actions">
+          <span id="updated-at" class="updated-at">等待数据</span>
+          <label class="refresh-select">刷新
+            <select id="refresh-interval">
+              <option value="2000">2 秒</option>
+              <option value="5000">5 秒</option>
+              <option value="10000">10 秒</option>
+              <option value="0">手动</option>
+            </select>
+          </label>
+          <button id="refresh-now" class="button primary" type="button">立即刷新</button>
+        </div>
+      </header>
+
+      <div id="error-banner" class="error-banner" hidden></div>
+
+      <main id="view-streams" class="page-view">
+        <section id="overview-cards" class="metric-grid loading-grid"></section>
+        <section class="panel">
+          <div class="panel-head">
+            <div><h2>活动流</h2><p>异常和无输入码率的流优先显示。</p></div>
+            <div id="feature-badges" class="badge-row"></div>
+          </div>
+          <div class="toolbar">
+            <input id="stream-search" type="search" placeholder="搜索 stream、app、协议或远端地址">
+            <span id="stream-count" class="muted">加载中…</span>
+          </div>
+          <div class="table-wrap">
+            <table class="stream-table">
+              <thead><tr><th>状态</th><th>流</th><th>编码</th><th>来源</th><th>输入</th><th>输出</th><th>观看</th><th>FPS</th></tr></thead>
+              <tbody id="stream-list"><tr><td colspan="8" class="empty">正在获取监控数据…</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+
+      <main id="view-detail" class="page-view" hidden>
+        <div class="detail-toolbar">
+          <a class="button" href="/console/streams" data-console-link>← 返回流列表</a>
+          <span id="detail-health"></span>
+        </div>
+        <section class="panel detail-hero">
+          <div><span class="eyebrow">STREAM DETAIL</span><h2 id="detail-name">-</h2><p id="detail-meta">-</p></div>
+          <div id="detail-codecs" class="badge-row"></div>
+        </section>
+        <section class="panel player-panel">
+          <div class="panel-head player-head">
+            <div><h2>实时预览</h2><p>可在 WebRTC、HTTP-fMP4 和 HTTP-FLV 之间切换。</p></div>
+            <div class="player-actions">
+              <div id="player-protocols" class="protocol-tabs"></div>
+              <button id="player-stop" class="button small" type="button">停止</button>
+            </div>
+          </div>
+          <div class="player-stage">
+            <video id="preview-video" controls muted autoplay playsinline></video>
+            <div id="player-placeholder" class="player-placeholder">正在等待流信息…</div>
+          </div>
+          <div class="player-foot">
+            <span id="player-status" class="player-status">未连接</span>
+            <span>浏览器对 H.265 的支持取决于系统解码能力；FLV 遇到 PCMA/PCMU 音频时仅预览视频。</span>
+          </div>
+        </section>
+        <section id="detail-metrics" class="metric-grid"></section>
+        <div class="detail-grid">
+          <section class="panel"><div class="panel-head"><div><h2>播放与测试地址</h2><p>HTTP 地址可直接打开，其他协议可一键复制。</p></div></div><div id="detail-urls" class="url-list"></div></section>
+          <section class="panel"><div class="panel-head"><div><h2>视频帧率</h2><p>最近统计周期的输入视频帧数。</p></div></div><div id="fps-chart" class="fps-chart"></div></section>
+        </div>
+        <section class="panel"><div class="panel-head"><div><h2>会话拓扑</h2><p>输入源及所有下游订阅会话。</p></div></div><div id="session-list" class="session-list"></div></section>
+      </main>
+
+      <main id="view-runtime" class="page-view" hidden>
+        <section id="runtime-cards" class="metric-grid"></section>
+        <div class="detail-grid">
+          <section class="panel"><div class="panel-head"><div><h2>服务信息</h2><p>构建版本和进程启动信息。</p></div></div><dl id="server-info" class="info-list"></dl></section>
+          <section class="panel"><div class="panel-head"><div><h2>诊断入口</h2><p>用于进一步排查流状态和 Go 运行时问题。</p></div></div><div id="diagnostic-links" class="diagnostic-links"></div></section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
